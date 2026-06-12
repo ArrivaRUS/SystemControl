@@ -41,9 +41,13 @@
 
 ## Скачать
 
-Готовый `System Control.app` — на [странице релизов](https://github.com/ArrivaRUS/SystemControl/releases).
+**[SystemControl-1.1.0.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
+открыть образ и перетащить `System Control` в `Applications`.
+
 Приложение подписано ad-hoc (не нотаризовано), поэтому при первом запуске:
 правый клик по приложению → **Открыть**.
+
+Сборка DMG из исходников: `./build.sh && scripts/make_dmg.sh`.
 
 ## Сборка из исходников
 

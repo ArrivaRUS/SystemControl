@@ -102,12 +102,12 @@ final class AppState: ObservableObject {
     private init() {
         groupByApps = defaults.object(forKey: "groupByApps") as? Bool ?? true
         let w = defaults.double(forKey: "windowSeconds")
-        // Миграция: сохранённое окно, которого больше нет в списке → 1m
+        // Миграция: сохранённое окно, которого больше нет в списке → дефолт 30s
         if Self.windowChoices.contains(where: { $0.seconds == w }) {
             windowSeconds = w
         } else {
-            windowSeconds = 60
-            defaults.set(60.0, forKey: "windowSeconds")
+            windowSeconds = 30
+            defaults.set(30.0, forKey: "windowSeconds")
         }
         let i = defaults.double(forKey: "updateInterval")
         updateInterval = i > 0 ? i : 2
@@ -136,7 +136,7 @@ final class AppState: ObservableObject {
         let (cpu, gpu) = thermals.summary(from: sensorList)
         let defaults = UserDefaults.standard
         let storedWindow = defaults.double(forKey: "windowSeconds")
-        let window = storedWindow > 0 ? storedWindow : 60
+        let window = storedWindow > 0 ? storedWindow : 30
         let grouping = defaults.object(forKey: "groupByApps") as? Bool ?? true
         let top = sampler.top(window: window, groupByApps: grouping, limit: Self.listLimit)
         let count = sampler.processCount

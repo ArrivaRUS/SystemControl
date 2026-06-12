@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-struct HeatControlApp: App {
+struct SystemControlApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var state = AppState.shared
 
@@ -20,7 +20,7 @@ struct HeatControlApp: App {
 // Временная отладка: unified log не показывает NSLog этого приложения
 func hcDebugLog(_ message: String) {
     let line = "\(Date()) \(message)\n"
-    let path = "/tmp/heatcontrol_debug.log"
+    let path = "/tmp/systemcontrol_debug.log"
     if let handle = FileHandle(forWritingAtPath: path) {
         handle.seekToEndOfFile()
         if let data = line.data(using: .utf8) { handle.write(data) }
@@ -41,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DistributedNotificationCenter.default().addObserver(
             self,
             selector: #selector(togglePanelNotification),
-            name: Notification.Name("com.arrivarus.heatcontrol.togglePanel"),
+            name: Notification.Name("com.arrivarus.systemcontrol.togglePanel"),
             object: nil,
             suspensionBehavior: .deliverImmediately
         )
@@ -53,7 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { @MainActor in PanelController.shared.toggle() }
     }
 
-    // Повторный `open /Applications/HeatControl.app` тоже переключает панель —
+    // Повторный `open /Applications/SystemControl.app` тоже переключает панель —
     // надёжный хук без XPC-гонок
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         hcDebugLog("reopen — toggling floating panel")
@@ -62,6 +62,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+// Лейбл в menu bar: 🔥62°  ⚡38W ↑0:42  ↓6:05
+//  • температура CPU — всегда (если включена)
+//  • при зарядке — мощность зарядки и прогноз до полного
+//  • всегда — прогноз времени работы от батареи при текущем потреблении
 struct MenuBarLabel: View {
     @EnvironmentObject var state: AppState
 
@@ -69,10 +73,34 @@ struct MenuBarLabel: View {
         HStack(spacing: 3) {
             Image(systemName: "flame.fill")
             if state.menuBarShowsTemp, let t = state.cpuTemp {
-                Text("\(Int(t.rounded()))°")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
+                segment("\(Int(t.rounded()))°")
+            }
+            if state.menuBarShowsPower, let b = state.menuBattery {
+                if b.charging {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 9, weight: .bold))
+                    if let w = b.chargeWatts {
+                        segment("\(w)W")
+                    }
+                    if let full = b.toFullMin {
+                        segment("↑\(hhmm(full))")
+                    }
+                }
+                if let empty = b.toEmptyMin {
+                    segment("↓\(hhmm(empty))")
+                        .opacity(0.85)
+                }
             }
         }
+    }
+
+    private func segment(_ text: String) -> Text {
+        Text(text)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+    }
+
+    private func hhmm(_ minutes: Int) -> String {
+        "\(minutes / 60):" + String(format: "%02d", minutes % 60)
     }
 }

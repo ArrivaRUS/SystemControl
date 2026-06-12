@@ -77,7 +77,7 @@ private struct HeaderBar: View {
                     .foregroundStyle(.white)
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text("Heat Control")
+                Text("System Control")
                     .font(.system(size: 13, weight: .semibold))
                 Text(Machine.chipName)
                     .font(.system(size: 9.5, weight: .medium))
@@ -399,7 +399,7 @@ private struct FooterBar: View {
                 }
                 Spacer()
             }
-            IconButton(systemName: "power", help: "Quit Heat Control", size: 11) {
+            IconButton(systemName: "power", help: "Quit System Control", size: 11) {
                 NSApp.terminate(nil)
             }
         }

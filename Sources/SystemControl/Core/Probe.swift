@@ -1,9 +1,9 @@
 import Foundation
 
-// Диагностический режим: `HeatControl --probe`
+// Диагностический режим: `SystemControl --probe`
 // Печатает все термосенсоры и топ процессов — для проверки ядра без UI.
 func runProbe() {
-    print("HeatControl probe — \(ProcessInfo.processInfo.operatingSystemVersionString)")
+    print("SystemControl probe — \(ProcessInfo.processInfo.operatingSystemVersionString)")
     print()
 
     let thermals = ThermalReader()
@@ -53,6 +53,10 @@ func runProbe() {
         if b.externalConnected {
             print("  adapter: \(b.adapterName ?? "?") · \(b.adapterWatts ?? 0)W")
         }
+        print(String(format: "  load (EMA): %@   est. runtime: %@   smc timer: %@",
+                     b.systemLoadWatts.map { String(format: "%.1fW", $0) } ?? "n/a",
+                     b.estEmptyMinutes.map { "\($0 / 60):" + String(format: "%02d", $0 % 60) } ?? "n/a",
+                     b.timeRemainingMinutes.map { "\($0 / 60):" + String(format: "%02d", $0 % 60) } ?? "n/a"))
     } else {
         print("  (no battery)")
     }

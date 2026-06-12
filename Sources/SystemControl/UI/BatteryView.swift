@@ -192,6 +192,10 @@ private struct ElectricalCard: View {
                 value: b.systemWatts.map { String(format: "%.1f W", $0) } ?? "—",
                 valueColor: .primary)
             divider
+            row(icon: "hourglass", label: "Runtime at current load",
+                value: b.estEmptyMinutes.map { "\($0 / 60):" + String(format: "%02d", $0 % 60) } ?? "—",
+                valueColor: .primary)
+            divider
             row(icon: "battery.100percent", label: "Battery power",
                 value: String(format: "%+.1f W", b.batteryWatts),
                 valueColor: b.batteryWatts < -0.05 ? Theme.amber : (b.batteryWatts > 0.05 ? Theme.mint : .secondary))

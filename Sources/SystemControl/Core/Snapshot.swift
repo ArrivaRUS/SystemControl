@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-// Диагностический режим: `HeatControl --snapshot [path]`
+// Диагностический режим: `SystemControl --snapshot [path]`
 // Собирает данные несколько секунд и рендерит панель оффскрин в PNG.
 @MainActor
 func runSnapshot(to path: String) {

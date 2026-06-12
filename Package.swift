@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "HeatControl",
+    name: "SystemControl",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "HeatControl",
-            path: "Sources/HeatControl",
+            name: "SystemControl",
+            path: "Sources/SystemControl",
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("SwiftUI"),

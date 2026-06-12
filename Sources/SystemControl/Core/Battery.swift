@@ -27,6 +27,9 @@ struct BatteryInfo: Equatable {
     var adapterVolts: Double?
     var adapterAmps: Double?
 
+    var systemLoadWatts: Double?     // потребление самой системы (без заряда батареи)
+    var estEmptyMinutes: Int?        // прогноз до разряда при текущем потреблении
+
     var serial: String
     var deviceName: String
 
@@ -37,10 +40,34 @@ struct BatteryInfo: Equatable {
     }
 }
 
+// Грубая сводка для menu bar: сильное квантование, чтобы скрытое UI-дерево
+// не перерисовывалось из-за мелких колебаний значений на каждом тике.
+struct MenuBatterySummary: Equatable {
+    var plugged: Bool
+    var charging: Bool
+    var chargeWatts: Int?   // мощность зарядки — только пока заряжается
+    var toFullMin: Int?     // прогноз до полного заряда, шаг 5 мин
+    var toEmptyMin: Int?    // прогноз до разряда при текущем потреблении, шаг 5 мин
+
+    init(_ b: BatteryInfo) {
+        plugged = b.externalConnected
+        charging = b.isCharging
+        chargeWatts = (b.isCharging && b.batteryWatts > 0.5) ? Int(b.batteryWatts.rounded()) : nil
+        toFullMin = b.isCharging ? b.timeRemainingMinutes.map(Self.coarse) : nil
+        toEmptyMin = b.estEmptyMinutes.map(Self.coarse)
+    }
+
+    private static func coarse(_ minutes: Int) -> Int {
+        max(5, (minutes + 2) / 5 * 5)
+    }
+}
+
 // Доступ только с очереди сэмплера; сервис неизменяем после init
 final class BatteryReader: @unchecked Sendable {
 
     private var service: io_registry_entry_t = 0
+    // Сглаженное потребление системы — чтобы прогноз времени не скакал
+    private var emaLoadWatts: Double?
 
     init() {
         service = IOServiceGetMatchingService(
@@ -93,15 +120,36 @@ final class BatteryReader: @unchecked Sendable {
 
         // Телеметрия SMC: реальное потребление системы.
         // На питании — от адаптера (SystemPowerIn), на батарее — BatteryPower.
+        // SystemLoad — потребление самой системы без учёта зарядки батареи.
         var systemWatts: Double?
+        var systemLoad: Double?
         if let telemetry = dict["PowerTelemetryData"] as? [String: Any] {
             let key = external ? "SystemPowerIn" : "BatteryPower"
             if let mw = telemetry[key] as? Int, mw > 0 {
                 systemWatts = Double(mw) / 1000.0
             }
+            if let mw = telemetry["SystemLoad"] as? Int, mw > 0 {
+                systemLoad = Double(mw) / 1000.0
+            }
         }
         if systemWatts == nil, !external, batteryWatts < 0 {
             systemWatts = -batteryWatts
+        }
+        if systemLoad == nil { systemLoad = systemWatts }
+
+        // Прогноз до разряда при текущем (сглаженном) потреблении.
+        // На батарее SMC сам ведёт оценку; на питании считаем гипотетический
+        // запас хода из текущего заряда и нагрузки системы.
+        if let load = systemLoad, load > 0.3 {
+            emaLoadWatts = emaLoadWatts.map { $0 + (load - $0) * 0.25 } ?? load
+        }
+        var estEmpty: Int? = external ? nil : minutes("AvgTimeToEmpty")
+        if estEmpty == nil, let load = emaLoadWatts, load > 0.3, rawCurrent > 0, voltage > 0 {
+            let wattHours = Double(rawCurrent) / 1000.0 * voltage
+            let est = wattHours / load * 60.0
+            if est.isFinite, est > 0 {
+                estEmpty = min(Int(est), 99 * 60)
+            }
         }
 
         var adapterWatts: Int?
@@ -138,6 +186,8 @@ final class BatteryReader: @unchecked Sendable {
             adapterName: adapterName,
             adapterVolts: adapterVolts,
             adapterAmps: adapterAmps,
+            systemLoadWatts: emaLoadWatts.map { ($0 * 10).rounded() / 10 },
+            estEmptyMinutes: estEmpty,
             serial: dict["Serial"] as? String ?? "—",
             deviceName: dict["DeviceName"] as? String ?? "—"
         )

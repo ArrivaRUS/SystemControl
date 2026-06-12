@@ -51,7 +51,7 @@ struct SettingsView: View {
                             disabled: !isBundled
                         )
                         if !isBundled {
-                            hint("Available when running as HeatControl.app")
+                            hint("Available when running as SystemControl.app")
                         }
                         if let loginError {
                             hint(loginError, color: Theme.red)
@@ -61,6 +61,12 @@ struct SettingsView: View {
                             icon: "thermometer.medium",
                             title: "Temperature in menu bar",
                             isOn: $state.menuBarShowsTemp
+                        )
+                        divider
+                        toggleRow(
+                            icon: "bolt.badge.clock",
+                            title: "Charging power & runtime in menu bar",
+                            isOn: $state.menuBarShowsPower
                         )
                         divider
                         HStack {
@@ -123,7 +129,7 @@ struct SettingsView: View {
                     }
 
                     VStack(spacing: 2) {
-                        Text("HeatControl 1.0 · by Alex Kovalev")
+                        Text("SystemControl 1.0 · by Alex Kovalev")
                         Text("Energy is CPU time averaged over the window")
                     }
                     .font(.system(size: 8.5))

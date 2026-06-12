@@ -1,8 +1,8 @@
-# 🔥 Heat Control
+# 🔥 System Control
 
 *by Alex Kovalev*
 
-[![Release](https://img.shields.io/github/v/release/ArrivaRUS/HeatControl?color=ff6b2c)](https://github.com/ArrivaRUS/HeatControl/releases)
+[![Release](https://img.shields.io/github/v/release/ArrivaRUS/SystemControl?color=ff6b2c)](https://github.com/ArrivaRUS/SystemControl/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-macOS%2014%2B%20·%20Apple%20Silicon-lightgrey)
 
@@ -26,7 +26,10 @@
   Цвет меняется от мятного (прохладно) до малинового (критично).
 - **Загрузка CPU и GPU на одном сдвоенном индикаторе** — внешнее кольцо CPU,
   внутреннее GPU, с общей историей.
-- **Температура CPU прямо в menu bar** рядом с иконкой-пламенем (отключается в настройках).
+- **Живой статус прямо в menu bar**: температура CPU, при зарядке — мощность
+  зарядки в ваттах (⚡38W) и прогноз до полного заряда (↑0:42), и всегда —
+  прогноз времени работы от батареи при текущем потреблении (↓6:05).
+  Каждый элемент отключается в настройках.
 - **Режим "поверх всех окон"** — кнопка 📌 открепляет панель в плавающее окошко,
   которое висит над всеми окнами и во всех Spaces. Закрыть — Esc или 📌.
 - **Вкладка Battery** — здоровье и использование батареи в духе coconutBattery:
@@ -38,16 +41,16 @@
 
 ## Скачать
 
-Готовый `HeatControl.app` — на [странице релизов](https://github.com/ArrivaRUS/HeatControl/releases).
+Готовый `System Control.app` — на [странице релизов](https://github.com/ArrivaRUS/SystemControl/releases).
 Приложение подписано ad-hoc (не нотаризовано), поэтому при первом запуске:
 правый клик по приложению → **Открыть**.
 
 ## Сборка из исходников
 
 ```bash
-./build.sh                                # соберёт dist/HeatControl.app
-cp -R dist/HeatControl.app /Applications/ # установить
-open /Applications/HeatControl.app
+./build.sh                                # соберёт "dist/System Control.app"
+cp -R "dist/System Control.app" /Applications/ # установить
+open "/Applications/System Control.app"
 ```
 
 Иконка-пламя появится в правом верхнем углу menu bar.
@@ -69,14 +72,14 @@ open /Applications/HeatControl.app
 ## Диагностика
 
 ```bash
-.build/release/HeatControl --probe     # все сенсоры + топ процессов в терминал
-.build/release/HeatControl --snapshot  # рендер панели в PNG без показа окна
+.build/release/SystemControl --probe     # все сенсоры + топ процессов в терминал
+.build/release/SystemControl --snapshot  # рендер панели в PNG без показа окна
 ```
 
 Переключить плавающую панель извне (для Shortcuts / скриптов):
 
 ```bash
-swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init("com.arrivarus.heatcontrol.togglePanel"), object: nil, userInfo: nil, deliverImmediately: true)'
+swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init("com.arrivarus.systemcontrol.togglePanel"), object: nil, userInfo: nil, deliverImmediately: true)'
 ```
 
 ## Ограничения

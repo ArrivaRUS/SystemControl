@@ -21,6 +21,7 @@ final class AppState: ObservableObject {
     @Published var gpuLoadHistory: [Double] = []
     @Published var sensors: [ThermalSensor] = []
     @Published var battery: BatteryInfo?
+    @Published var menuBattery: MenuBatterySummary?
     @Published var processCount: Int = 0
     @Published var historyDepth: TimeInterval = 0
     @Published var killMessage: String?
@@ -39,6 +40,9 @@ final class AppState: ObservableObject {
     @Published var menuBarShowsTemp: Bool {
         didSet { defaults.set(menuBarShowsTemp, forKey: "menuBarShowsTemp") }
     }
+    @Published var menuBarShowsPower: Bool {
+        didSet { defaults.set(menuBarShowsPower, forKey: "menuBarShowsPower") }
+    }
 
     static let windowChoices: [(label: String, seconds: Double)] = [
         ("10s", 10), ("30s", 30), ("1m", 60),
@@ -55,7 +59,7 @@ final class AppState: ObservableObject {
     nonisolated private let load = SystemLoad()
     nonisolated private let gpuMeter = GPULoad()
     nonisolated private let batteryReader = BatteryReader()
-    nonisolated private let queue = DispatchQueue(label: "heatcontrol.sampler", qos: .utility)
+    nonisolated private let queue = DispatchQueue(label: "systemcontrol.sampler", qos: .utility)
     private var timer: DispatchSourceTimer?
     private var killMessageTask: Task<Void, Never>?
 
@@ -104,6 +108,16 @@ final class AppState: ObservableObject {
     }
 
     private init() {
+        // Миграция настроек со старого bundle id (com.arrivarus.heatcontrol)
+        if defaults.object(forKey: "windowSeconds") == nil,
+           let old = UserDefaults(suiteName: "com.arrivarus.heatcontrol") {
+            for key in ["groupByApps", "windowSeconds", "updateInterval", "menuBarShowsTemp"] {
+                if let v = old.object(forKey: key), defaults.object(forKey: key) == nil {
+                    defaults.set(v, forKey: key)
+                }
+            }
+        }
+
         groupByApps = defaults.object(forKey: "groupByApps") as? Bool ?? true
         let w = defaults.double(forKey: "windowSeconds")
         // Миграция: сохранённое окно, которого больше нет в списке → дефолт 30s
@@ -116,6 +130,7 @@ final class AppState: ObservableObject {
         let i = defaults.double(forKey: "updateInterval")
         updateInterval = i > 0 ? i : 2
         menuBarShowsTemp = defaults.object(forKey: "menuBarShowsTemp") as? Bool ?? true
+        menuBarShowsPower = defaults.object(forKey: "menuBarShowsPower") as? Bool ?? true
         restartTimer()
     }
 
@@ -166,6 +181,10 @@ final class AppState: ObservableObject {
                          battery batteryInfo: BatteryInfo?) {
         // Всегда: сглаживание и лента истории
         if let batteryInfo { smBattery = batteryInfo }
+
+        // Сводка для menu bar нужна и при скрытой панели
+        let summary = smBattery.map(MenuBatterySummary.init)
+        if menuBattery != summary { menuBattery = summary }
         if let cpu { smCpuTemp = Self.smoothQ(smCpuTemp, cpu, step: 0.5) }
         if let gpu { smGpuTemp = Self.smoothQ(smGpuTemp, gpu, step: 0.5) }
         if let load { smCpuLoad = Self.smoothQ(smCpuLoad, load, step: 1) }

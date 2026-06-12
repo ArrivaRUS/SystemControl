@@ -1,16 +1,16 @@
 #!/bin/zsh
-# Сборка HeatControl.app
+# Сборка System Control.app
 set -e
 cd "$(dirname "$0")"
 
 echo "→ swift build (release)"
 swift build -c release
 
-APP=dist/HeatControl.app
+APP="dist/System Control.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-cp .build/release/HeatControl "$APP/Contents/MacOS/HeatControl"
+cp .build/release/SystemControl "$APP/Contents/MacOS/SystemControl"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 
 # Иконка: генерируем один раз, дальше переиспользуем
@@ -26,5 +26,5 @@ fi
 codesign --force -s - "$APP" 2>/dev/null
 
 echo "✓ Built $APP"
-echo "  Запуск:    open $APP"
-echo "  Установка: cp -R $APP /Applications/"
+echo "  Запуск:    open \"$APP\""
+echo "  Установка: cp -R \"$APP\" /Applications/"

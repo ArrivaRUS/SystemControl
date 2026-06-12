@@ -2,10 +2,10 @@ import Foundation
 import CoreFoundation
 
 // Температуры из двух источников:
-//  1) HID-сенсоры SoC (usage page 0xff00 / usage 5) — CPU die и др.
+//  1) HID-сенсоры SoC (usage page 0xff00 / usage 5) — CPU die и др. Быстрые.
 //  2) SMC-ключи "T*" — на Apple Silicon дают GPU ("Tg*"), которого нет в HID.
-// Имена различаются между поколениями чипов, поэтому CPU/GPU определяются
-// по паттернам, а полный список виден в настройках.
+//     SMC медленный (~1мс/ключ), поэтому каждый тик читаются только нужные
+//     для сводки ключи, а полный список — лишь пока он открыт в настройках.
 
 struct ThermalSensor: Identifiable, Equatable {
     let id: String
@@ -13,15 +13,45 @@ struct ThermalSensor: Identifiable, Equatable {
     let value: Double
 }
 
-// Доступ только с очереди сэмплера; клиенты неизменяемы после init
+// Доступ только с очереди сэмплера; кэш сервисов неизменяем после init
 final class ThermalReader: @unchecked Sendable {
 
     private var client: UnsafeMutableRawPointer?
+    private var hidServices: [(service: UnsafeMutableRawPointer, name: String)] = []
+    private var hidServicesArray: CFArray? // удерживает service-указатели живыми
     private let smc = SMCReader()
+    private var smcSummaryKeys: [SMCReader.TempKey] = []
+
+    private let stateLock = NSLock()
+    private var _fullSensorList = false
+
+    /// Полный (дорогой) опрос всех SMC-ключей — включается, пока пользователь
+    /// смотрит список сенсоров в настройках.
+    var fullSensorList: Bool {
+        get { stateLock.lock(); defer { stateLock.unlock() }; return _fullSensorList }
+        set { stateLock.lock(); _fullSensorList = newValue; stateLock.unlock() }
+    }
 
     init() {
+        setupHID()
+
+        // Ключи для сводки: GPU (Tg*) всегда; CPU из SMC (Tp*/Tc*) — только
+        // как фолбэк, если HID недоступен.
+        if let smc {
+            smcSummaryKeys = smc.tempKeys.filter { $0.name.hasPrefix("Tg") }
+            if client == nil {
+                smcSummaryKeys += smc.tempKeys.filter {
+                    $0.name.hasPrefix("Tp") || $0.name.hasPrefix("Tc")
+                }
+            }
+        }
+    }
+
+    private func setupHID() {
         guard let create = PrivateAPI.hidClientCreate,
               let setMatching = PrivateAPI.hidSetMatching,
+              let copyServices = PrivateAPI.hidCopyServices,
+              let copyProperty = PrivateAPI.hidCopyProperty,
               let client = create(kCFAllocatorDefault) else { return }
         // AppleARMIODevice temperature sensors
         let matching: [String: Int] = [
@@ -29,7 +59,21 @@ final class ThermalReader: @unchecked Sendable {
             "PrimaryUsage": 5,
         ]
         _ = setMatching(client, matching as CFDictionary)
+
+        // Кэшируем сервисы и их имена один раз — CopyServices/CopyProperty
+        // на каждом тике не нужны
+        guard let services = copyServices(client)?.takeRetainedValue() else { return }
+        var list: [(UnsafeMutableRawPointer, String)] = []
+        for i in 0..<CFArrayGetCount(services) {
+            guard let raw = CFArrayGetValueAtIndex(services, i) else { continue }
+            let service = UnsafeMutableRawPointer(mutating: raw)
+            guard let nameRef = copyProperty(service, "Product" as CFString)?.takeRetainedValue(),
+                  let name = nameRef as? String else { continue }
+            list.append((service, name))
+        }
         self.client = client
+        self.hidServicesArray = services
+        self.hidServices = list
     }
 
     var isAvailable: Bool { client != nil || smc != nil }
@@ -37,7 +81,10 @@ final class ThermalReader: @unchecked Sendable {
     func readAll() -> [ThermalSensor] {
         var raw: [(name: String, value: Double)] = readHID()
         if let smc {
-            raw += smc.readAll().map { ("SMC \($0.name)", $0.value) }
+            let smcValues = fullSensorList
+                ? smc.readAll()
+                : smc.read(keys: smcSummaryKeys)
+            raw += smcValues.map { ("SMC \($0.name)", $0.value) }
         }
         raw.sort { $0.name < $1.name }
 
@@ -55,22 +102,12 @@ final class ThermalReader: @unchecked Sendable {
     }
 
     private func readHID() -> [(name: String, value: Double)] {
-        guard let client,
-              let copyServices = PrivateAPI.hidCopyServices,
-              let copyProperty = PrivateAPI.hidCopyProperty,
-              let copyEvent = PrivateAPI.hidCopyEvent,
-              let getFloat = PrivateAPI.hidGetFloatValue,
-              let services = copyServices(client)?.takeRetainedValue() else { return [] }
+        guard let copyEvent = PrivateAPI.hidCopyEvent,
+              let getFloat = PrivateAPI.hidGetFloatValue else { return [] }
 
         var result: [(String, Double)] = []
-        let count = CFArrayGetCount(services)
-        for i in 0..<count {
-            guard let rawPtr = CFArrayGetValueAtIndex(services, i) else { continue }
-            let service = UnsafeMutableRawPointer(mutating: rawPtr)
-
-            guard let nameRef = copyProperty(service, "Product" as CFString)?.takeRetainedValue(),
-                  let name = nameRef as? String else { continue }
-
+        result.reserveCapacity(hidServices.count)
+        for (service, name) in hidServices {
             guard let event = copyEvent(service, PrivateAPI.kIOHIDEventTypeTemperature, 0, 0) else { continue }
             let value = getFloat(event, PrivateAPI.temperatureField)
             // Балансируем +1 retain от Copy-функции
@@ -99,7 +136,7 @@ final class ThermalReader: @unchecked Sendable {
             }
         }
 
-        // Fallback'и, если основные паттерны не нашлись на этом чипе
+        // Фолбэки, если основные паттерны не нашлись на этом чипе
         if cpuValues.isEmpty {
             cpuValues = sensors
                 .filter { $0.name.lowercased().hasPrefix("smc tp") || $0.name.lowercased().hasPrefix("smc tc") }

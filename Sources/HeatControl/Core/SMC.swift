@@ -47,10 +47,15 @@ final class SMCReader: @unchecked Sendable {
     // MARK: - Публичное
 
     /// Все температурные ключи с текущими значениями.
+    /// Внимание: ~300+ ключей × ~1мс на YPC-вызов — дорого, не дёргать каждый тик.
     func readAll() -> [(name: String, value: Double)] {
+        read(keys: tempKeys)
+    }
+
+    func read(keys: [TempKey]) -> [(name: String, value: Double)] {
         var result: [(String, Double)] = []
-        result.reserveCapacity(tempKeys.count)
-        for k in tempKeys {
+        result.reserveCapacity(keys.count)
+        for k in keys {
             guard let v = readValue(k), v > 1, v < 130 else { continue }
             result.append((k.name, v))
         }

@@ -41,7 +41,7 @@ final class AppState: ObservableObject {
         ("10s", 10), ("1m", 60), ("5m", 300),
     ]
     static let intervalChoices: [(label: String, seconds: Double)] = [
-        ("1s", 1), ("2s", 2), ("5s", 5),
+        ("1s", 1), ("2s", 2), ("5s", 5), ("10s", 10),
     ]
 
     // MARK: - Внутренности
@@ -122,6 +122,22 @@ final class AppState: ObservableObject {
     private static func smooth(_ old: Double?, _ new: Double) -> Double {
         guard let old else { return new }
         return old + (new - old) * 0.45
+    }
+
+    /// Пока открыт список сенсоров в настройках — читаем все SMC-ключи
+    /// (дорого), иначе только нужные для сводки.
+    func setSensorListVisible(_ visible: Bool) {
+        thermals.fullSensorList = visible
+        if visible { refreshSensorsNow() }
+    }
+
+    /// Немедленный опрос сенсоров вне расписания таймера (при раскрытии списка).
+    private func refreshSensorsNow() {
+        queue.async { [weak self] in
+            guard let self else { return }
+            let list = self.thermals.readAll()
+            Task { @MainActor in self.sensors = list }
+        }
     }
 
     /// Мгновенный пересчёт топа при смене окна/группировки.

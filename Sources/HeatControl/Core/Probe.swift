@@ -7,7 +7,8 @@ func runProbe() {
     print()
 
     let thermals = ThermalReader()
-    print("== Thermal sensors (HID) ==")
+    thermals.fullSensorList = true
+    print("== Thermal sensors (HID + SMC) ==")
     if !thermals.isAvailable {
         print("  !! IOHIDEventSystemClient unavailable")
     }

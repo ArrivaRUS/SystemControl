@@ -81,11 +81,14 @@ struct SettingsView: View {
                             withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
                                 sensorsExpanded.toggle()
                             }
+                            state.setSensorListVisible(sensorsExpanded)
                         } label: {
                             HStack {
                                 rowLabel(
                                     icon: "sensor.fill",
-                                    title: "All thermal sensors (\(state.sensors.count))"
+                                    title: sensorsExpanded
+                                        ? "All thermal sensors (\(state.sensors.count))"
+                                        : "All thermal sensors"
                                 )
                                 Spacer()
                                 Image(systemName: "chevron.down")
@@ -135,6 +138,7 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.panelBackground)
         .onAppear { refreshLoginStatus() }
+        .onDisappear { state.setSensorListVisible(false) }
     }
 
     // MARK: - Строительные блоки

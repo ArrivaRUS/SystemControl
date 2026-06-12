@@ -61,11 +61,18 @@ final class PanelController: NSObject, NSWindowDelegate {
 
         panel.orderFrontRegardless()
         self.panel = panel
+        hcDebugLog("floating panel shown")
     }
 
     func close() {
-        panel?.close()
-        panel = nil
+        guard let panel else { return }
+        self.panel = nil
+        panel.delegate = nil
+        // Отцепляем SwiftUI-дерево немедленно: иначе при задержавшемся
+        // dealloc окна оно продолжило бы пересчитываться на каждом тике
+        panel.contentView = NSView()
+        panel.close()
+        hcDebugLog("floating panel closed")
     }
 
     func toggle() {

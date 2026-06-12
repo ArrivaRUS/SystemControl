@@ -7,6 +7,7 @@ import AppKit
 func runSnapshot(to path: String) {
     _ = NSApplication.shared // инициализация AppKit для иконок/рендера
     let state = AppState.shared
+    state.panelAppeared() // оффскрин-рендер = «видимый» UI, иначе публикации заглушены
 
     print("collecting samples…")
     RunLoop.main.run(until: Date().addingTimeInterval(7))

@@ -24,6 +24,9 @@ final class ThermalReader: @unchecked Sendable {
 
     private let stateLock = NSLock()
     private var _fullSensorList = false
+    private var _gpuActiveHint = false
+    private var lastDiscovery = Date()
+    private static let rediscoverCooldown: TimeInterval = 60
 
     /// Полный (дорогой) опрос всех SMC-ключей — включается, пока пользователь
     /// смотрит список сенсоров в настройках.
@@ -32,17 +35,26 @@ final class ThermalReader: @unchecked Sendable {
         set { stateLock.lock(); _fullSensorList = newValue; stateLock.unlock() }
     }
 
+    /// Подсказка от IOAccelerator: GPU сейчас работает. Если при этом его
+    /// датчиков нет среди ключей — набор ключей устарел, надо переобнаружить.
+    var gpuActiveHint: Bool {
+        get { stateLock.lock(); defer { stateLock.unlock() }; return _gpuActiveHint }
+        set { stateLock.lock(); _gpuActiveHint = newValue; stateLock.unlock() }
+    }
+
     init() {
         setupHID()
+        recomputeSummaryKeys()
+    }
 
-        // Ключи для сводки: GPU (Tg*) всегда; CPU из SMC (Tp*/Tc*) — только
-        // как фолбэк, если HID недоступен.
-        if let smc {
-            smcSummaryKeys = smc.tempKeys.filter { $0.name.hasPrefix("Tg") }
-            if client == nil {
-                smcSummaryKeys += smc.tempKeys.filter {
-                    $0.name.hasPrefix("Tp") || $0.name.hasPrefix("Tc")
-                }
+    // Ключи для сводки: GPU (Tg*) всегда; CPU из SMC (Tp*/Tc*) — только
+    // как фолбэк, если HID недоступен.
+    private func recomputeSummaryKeys() {
+        guard let smc else { return }
+        smcSummaryKeys = smc.tempKeys.filter { $0.name.hasPrefix("Tg") }
+        if client == nil {
+            smcSummaryKeys += smc.tempKeys.filter {
+                $0.name.hasPrefix("Tp") || $0.name.hasPrefix("Tc")
             }
         }
     }
@@ -85,6 +97,18 @@ final class ThermalReader: @unchecked Sendable {
                 ? smc.readAll()
                 : smc.read(keys: smcSummaryKeys)
             raw += smcValues.map { ("SMC \($0.name)", $0.value) }
+
+            // GPU работает, а правдоподобных GPU-датчиков нет — набор
+            // динамических SMC-ключей устарел, переобнаруживаем (с кулдауном)
+            let gpuPlausible = smcValues.contains {
+                $0.name.hasPrefix("Tg") && Self.plausible($0.value)
+            }
+            if gpuActiveHint, !gpuPlausible,
+               Date().timeIntervalSince(lastDiscovery) > Self.rediscoverCooldown {
+                smc.rediscover()
+                recomputeSummaryKeys()
+                lastDiscovery = Date()
+            }
         }
         raw.sort { $0.name < $1.name }
 
@@ -120,12 +144,18 @@ final class ThermalReader: @unchecked Sendable {
         return result
     }
 
+    /// Температура похожа на реальную температуру кристалла. Датчики
+    /// обесточенных доменов читают ~1.5°C — отсекаем.
+    private static func plausible(_ v: Double) -> Bool {
+        v >= 10 && v <= 125
+    }
+
     /// Сводка: горячая точка CPU и GPU по паттернам имён сенсоров.
     func summary(from sensors: [ThermalSensor]) -> (cpu: Double?, gpu: Double?) {
         var cpuValues: [Double] = []
         var gpuValues: [Double] = []
 
-        for s in sensors {
+        for s in sensors where Self.plausible(s.value) {
             let n = s.name.lowercased()
             if n.contains("gpu") || n.hasPrefix("smc tg") {
                 gpuValues.append(s.value)
@@ -139,11 +169,13 @@ final class ThermalReader: @unchecked Sendable {
         // Фолбэки, если основные паттерны не нашлись на этом чипе
         if cpuValues.isEmpty {
             cpuValues = sensors
+                .filter { Self.plausible($0.value) }
                 .filter { $0.name.lowercased().hasPrefix("smc tp") || $0.name.lowercased().hasPrefix("smc tc") }
                 .map(\.value)
         }
         if cpuValues.isEmpty {
             cpuValues = sensors
+                .filter { Self.plausible($0.value) }
                 .filter {
                     let n = $0.name.lowercased()
                     return !n.contains("battery") && !n.contains("nand") && !n.contains("gas gauge")

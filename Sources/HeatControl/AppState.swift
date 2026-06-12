@@ -60,6 +60,45 @@ final class AppState: ObservableObject {
     private nonisolated static let historyPoints = 90
     private nonisolated static let listLimit = 9
 
+    // MARK: - Видимость UI
+    // Окно MenuBarExtra после закрытия остаётся жить вместе со всем
+    // SwiftUI-деревом, и любая публикация заставляет его пересчитываться
+    // за кадром. Поэтому данные уходят в @Published только пока панель
+    // реально видима; в фоне копятся внутренние буферы, а наружу идёт
+    // лишь температура для menu bar.
+
+    private var visiblePanels = 0
+    private var uiVisible: Bool { visiblePanels > 0 }
+
+    private var smCpuTemp: Double?
+    private var smGpuTemp: Double?
+    private var smCpuLoad: Double?
+    private var smGpuLoad: Double?
+    private var bufCpuTempHistory: [Double] = []
+    private var bufGpuTempHistory: [Double] = []
+    private var bufCpuLoadHistory: [Double] = []
+    private var bufGpuLoadHistory: [Double] = []
+
+    func panelAppeared() {
+        visiblePanels += 1
+        hcDebugLog("panelAppeared, visible=\(visiblePanels)")
+        guard visiblePanels == 1 else { return }
+        // Мгновенно отдаём накопленное и просим свежий срез вне расписания
+        cpuTempHistory = bufCpuTempHistory
+        gpuTempHistory = bufGpuTempHistory
+        cpuLoadHistory = bufCpuLoadHistory
+        gpuLoadHistory = bufGpuLoadHistory
+        if let v = smGpuTemp, gpuTemp != v { gpuTemp = v }
+        if let v = smCpuLoad, cpuLoad != v { cpuLoad = v }
+        if let v = smGpuLoad, gpuLoad != v { gpuLoad = v }
+        queue.async { [weak self] in self?.tick() }
+    }
+
+    func panelDisappeared() {
+        visiblePanels = max(0, visiblePanels - 1)
+        hcDebugLog("panelDisappeared, visible=\(visiblePanels)")
+    }
+
     private init() {
         groupByApps = defaults.object(forKey: "groupByApps") as? Bool ?? true
         let w = defaults.double(forKey: "windowSeconds")
@@ -83,10 +122,12 @@ final class AppState: ObservableObject {
     // Выполняется на фоновой очереди
     nonisolated private func tick() {
         sampler.sample()
-        let sensorList = thermals.readAll()
-        let (cpu, gpu) = thermals.summary(from: sensorList)
         let loadValue = load.sample()
         let gpuLoadValue = gpuMeter.sample()
+        // Подсказка для переобнаружения динамических GPU-ключей SMC
+        thermals.gpuActiveHint = (gpuLoadValue ?? 0) > 5
+        let sensorList = thermals.readAll()
+        let (cpu, gpu) = thermals.summary(from: sensorList)
         let defaults = UserDefaults.standard
         let storedWindow = defaults.double(forKey: "windowSeconds")
         let window = storedWindow > 0 ? storedWindow : 60
@@ -102,21 +143,70 @@ final class AppState: ObservableObject {
         }
     }
 
+    // Сбор данных идёт каждый тик. В фоне обновляются только буферы и
+    // температура для menu bar; видимые @Published-свойства получают значения
+    // лишь при открытой панели — и только если ВИДИМОЕ значение реально
+    // изменилось (квантование до точности отображения), иначе каждый тик
+    // запускал бы анимации ради невидимых сдвигов на 0.1°.
     private func publish(top: [EnergyEntry], count: Int, depth: TimeInterval,
                          sensors: [ThermalSensor], cpu: Double?, gpu: Double?,
                          load: Double?, gpuLoad gpuLoadValue: Double?) {
-        entries = top
-        processCount = count
-        historyDepth = depth
-        self.sensors = sensors
-        if let cpu { cpuTemp = Self.smooth(cpuTemp, cpu) }
-        if let gpu { gpuTemp = Self.smooth(gpuTemp, gpu) }
-        if let load { cpuLoad = Self.smooth(cpuLoad, load) }
-        if let gpuLoadValue { gpuLoad = Self.smooth(gpuLoad, gpuLoadValue) }
-        Self.push(&cpuTempHistory, cpuTemp)
-        Self.push(&gpuTempHistory, gpuTemp)
-        Self.push(&cpuLoadHistory, load == nil ? nil : cpuLoad)
-        Self.push(&gpuLoadHistory, gpuLoadValue == nil ? nil : gpuLoad)
+        // Всегда: сглаживание и лента истории
+        if let cpu { smCpuTemp = Self.smoothQ(smCpuTemp, cpu, step: 0.5) }
+        if let gpu { smGpuTemp = Self.smoothQ(smGpuTemp, gpu, step: 0.5) }
+        if let load { smCpuLoad = Self.smoothQ(smCpuLoad, load, step: 1) }
+        if let gpuLoadValue { smGpuLoad = Self.smoothQ(smGpuLoad, gpuLoadValue, step: 1) }
+        Self.push(&bufCpuTempHistory, smCpuTemp)
+        Self.push(&bufGpuTempHistory, smGpuTemp)
+        Self.push(&bufCpuLoadHistory, load == nil ? nil : smCpuLoad)
+        Self.push(&bufGpuLoadHistory, gpuLoadValue == nil ? nil : smGpuLoad)
+
+        // Температура CPU нужна и при скрытой панели — она в menu bar
+        if let v = smCpuTemp, cpuTemp != v { cpuTemp = v }
+
+        guard uiVisible else { return }
+
+        setEntries(top)
+        if processCount != count { processCount = count }
+
+        // Глубина истории нужна UI только для плашки "collecting …" —
+        // выше порога текущего окна перестаём её публиковать
+        let depthCap = min(windowSeconds + 2, ProcessSampler.maxHistory)
+        let depthQ = min(depth.rounded(), depthCap)
+        if historyDepth != depthQ { historyDepth = depthQ }
+
+        let sensorsQ = sensors.map {
+            ThermalSensor(id: $0.id, name: $0.name, value: Self.quantize($0.value, step: 0.1))
+        }
+        if self.sensors != sensorsQ { self.sensors = sensorsQ }
+
+        if let v = smGpuTemp, gpuTemp != v { gpuTemp = v }
+        if let v = smCpuLoad, cpuLoad != v { cpuLoad = v }
+        if let v = smGpuLoad, gpuLoad != v { gpuLoad = v }
+
+        cpuTempHistory = bufCpuTempHistory
+        gpuTempHistory = bufGpuTempHistory
+        cpuLoadHistory = bufCpuLoadHistory
+        gpuLoadHistory = bufGpuLoadHistory
+    }
+
+    private func setEntries(_ top: [EnergyEntry]) {
+        let q = top.map { e in
+            EnergyEntry(
+                id: e.id, pid: e.pid, name: e.name, path: e.path,
+                cpuPercent: Self.quantize(e.cpuPercent, step: 0.1),
+                processCount: e.processCount, isGroup: e.isGroup
+            )
+        }
+        if entries != q { entries = q }
+    }
+
+    private static func smoothQ(_ old: Double?, _ new: Double, step: Double) -> Double {
+        quantize(smooth(old, new), step: step)
+    }
+
+    private static func quantize(_ v: Double, step: Double) -> Double {
+        (v / step).rounded() * step
     }
 
     private static func push(_ array: inout [Double], _ value: Double?) {
@@ -155,7 +245,7 @@ final class AppState: ObservableObject {
         queue.async { [weak self] in
             guard let self else { return }
             let top = self.sampler.top(window: window, groupByApps: grouping, limit: Self.listLimit)
-            Task { @MainActor in self.entries = top }
+            Task { @MainActor in self.setEntries(top) }
         }
     }
 

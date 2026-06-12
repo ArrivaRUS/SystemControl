@@ -25,6 +25,8 @@ struct MainPanelView: View {
         }
         .animation(.spring(response: 0.36, dampingFraction: 0.86), value: showSettings)
         .overlay(alignment: .bottom) { ToastView() }
+        .onAppear { state.panelAppeared() }
+        .onDisappear { state.panelDisappeared() }
         .frame(width: Self.panelSize.width, height: Self.panelSize.height)
         .background(Theme.panelBackground)
         .clipShape(RoundedRectangle(cornerRadius: isFloating ? 19 : 0, style: .continuous))

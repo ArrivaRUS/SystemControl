@@ -40,6 +40,13 @@ final class SMCReader: @unchecked Sendable {
         }
     }
 
+    /// Набор SMC-ключей динамический: датчики обесточенных доменов (например,
+    /// простаивающего GPU) исчезают и появляются. Позволяет переобнаружить.
+    func rediscover() {
+        tempKeys.removeAll()
+        discoverTempKeys()
+    }
+
     deinit {
         if connection != 0 { IOServiceClose(connection) }
     }

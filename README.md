@@ -2,6 +2,10 @@
 
 *by Alex Kovalev*
 
+[![Release](https://img.shields.io/github/v/release/ArrivaRUS/HeatControl?color=ff6b2c)](https://github.com/ArrivaRUS/HeatControl/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-macOS%2014%2B%20·%20Apple%20Silicon-lightgrey)
+
 Нативная menu bar утилита для macOS: показывает, **кто жрёт энергию и греет MacBook**, температуры CPU/GPU — и позволяет прибить виновника в один клик.
 
 ![Главная панель](assets/preview_main.png)
@@ -23,7 +27,13 @@
 - **Автозапуск при логине**, настройка частоты обновления (1/2/5 с).
 - **Полный список термосенсоров** (сотни датчиков SoC) — в настройках.
 
-## Установка
+## Скачать
+
+Готовый `HeatControl.app` — на [странице релизов](https://github.com/ArrivaRUS/HeatControl/releases).
+Приложение подписано ad-hoc (не нотаризовано), поэтому при первом запуске:
+правый клик по приложению → **Открыть**.
+
+## Сборка из исходников
 
 ```bash
 ./build.sh                                # соберёт dist/HeatControl.app

@@ -20,7 +20,10 @@ struct ProcessListView: View {
                 ScrollView(showsIndicators: false) { listContent }
             }
         }
-        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: state.entries)
+        // Анимируем список только при смене СОСТАВА/ПОРЯДКА строк, а не на
+        // каждом тике с новыми процентами — иначе панель почти постоянно
+        // рендерит пружины на 120 Гц и греет сама себя
+        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: state.entries.map(\.id))
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: confirmID)
     }
 
@@ -163,6 +166,8 @@ private struct EnergyBar: View {
                     .frame(width: max(3, geo.size.width * CGFloat(max(0, min(1, fraction)))))
             }
         }
+        // Короткая локальная анимация ширины — вместо пружины на всю строку
+        .animation(.easeOut(duration: 0.3), value: fraction)
     }
 }
 

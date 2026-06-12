@@ -165,8 +165,8 @@ private struct DualLoadCard: View {
                 .frame(width: 26)
             }
             .padding(.top, 2)
-            .animation(.easeOut(duration: 0.7), value: cpu)
-            .animation(.easeOut(duration: 0.7), value: gpu)
+            .animation(.easeOut(duration: 0.4), value: cpu)
+            .animation(.easeOut(duration: 0.4), value: gpu)
 
             HStack(spacing: 8) {
                 legend("CPU", Theme.sky)
@@ -225,7 +225,7 @@ private struct GaugeCard: View {
                     .frame(width: 40)
             }
             .padding(.top, 2)
-            .animation(.easeOut(duration: 0.7), value: progress)
+            .animation(.easeOut(duration: 0.4), value: progress)
 
             Text(title)
                 .font(.system(size: 9, weight: .bold))

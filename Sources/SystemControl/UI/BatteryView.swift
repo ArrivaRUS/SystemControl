@@ -191,10 +191,13 @@ private struct ElectricalCard: View {
             row(icon: "gauge.with.dots.needle.50percent", label: "System power",
                 value: b.systemWatts.map { String(format: "%.1f W", $0) } ?? "—",
                 valueColor: .primary)
-            divider
-            row(icon: "hourglass", label: "Runtime at current load",
-                value: b.estEmptyMinutes.map { "\($0 / 60):" + String(format: "%02d", $0 % 60) } ?? "—",
-                valueColor: .primary)
+            // Прогноз времени работы — только когда реально работаем от батареи
+            if !b.externalConnected {
+                divider
+                row(icon: "hourglass", label: "Runtime at current load",
+                    value: b.estEmptyMinutes.map { "\($0 / 60):" + String(format: "%02d", $0 % 60) } ?? "—",
+                    valueColor: .primary)
+            }
             divider
             row(icon: "battery.100percent", label: "Battery power",
                 value: String(format: "%+.1f W", b.batteryWatts),

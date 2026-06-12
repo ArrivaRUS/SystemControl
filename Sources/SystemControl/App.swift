@@ -65,27 +65,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // Лейбл в menu bar: 🔥62° ⚡96W
 //  • температура CPU — всегда (если включена)
 //  • на внешнем питании — мощность, потребляемая от адаптера
+// Всё собрано в ОДИН составной Text: статус-айтем MenuBarExtra не
+// пересчитывает ширину для появившихся позже соседних view (контент
+// обрезается при переходе батарея → провод), а одиночный Text — ресайзит.
 struct MenuBarLabel: View {
     @EnvironmentObject var state: AppState
 
     var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: "flame.fill")
-            if state.menuBarShowsTemp, let t = state.cpuTemp {
-                segment("\(Int(t.rounded()))°")
-            }
-            if state.menuBarShowsPower, let b = state.menuBattery,
-               b.plugged, let w = b.watts {
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 9, weight: .bold))
-                segment("\(w)W")
-            }
-        }
-    }
-
-    private func segment(_ text: String) -> Text {
-        Text(text)
+        composed
             .font(.system(size: 12, weight: .semibold, design: .rounded))
             .monospacedDigit()
+    }
+
+    private var composed: Text {
+        var result = Text(Image(systemName: "flame.fill"))
+        if state.menuBarShowsTemp, let t = state.cpuTemp {
+            result = result + Text(" \(Int(t.rounded()))°")
+        }
+        if state.menuBarShowsPower, let b = state.menuBattery,
+           b.plugged, let w = b.watts {
+            result = result + Text("  ") + Text(Image(systemName: "bolt.fill")) + Text("\(w)W")
+        }
+        return result
     }
 }

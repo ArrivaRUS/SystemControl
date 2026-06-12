@@ -28,6 +28,15 @@ func runSnapshot(to path: String) {
         .environmentObject(state)
         .environment(\.colorScheme, .dark)
     render(settings, to: (path as NSString).deletingPathExtension + "_settings.png")
+
+    // Лейбл menu bar — что именно увидит пользователь в статус-баре
+    print("menuBattery: \(String(describing: state.menuBattery))")
+    let label = MenuBarLabel()
+        .environmentObject(state)
+        .environment(\.colorScheme, .dark)
+        .padding(8)
+        .background(Color.black)
+    render(label, to: (path as NSString).deletingPathExtension + "_label.png")
 }
 
 @MainActor

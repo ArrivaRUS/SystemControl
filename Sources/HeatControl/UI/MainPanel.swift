@@ -123,13 +123,11 @@ private struct GaugesRow: View {
                 color: state.gpuTemp.map(Theme.tempColor) ?? .gray,
                 history: state.gpuTempHistory
             )
-            GaugeCard(
-                title: "LOAD",
-                display: "\(Int(state.cpuLoad.rounded()))%",
-                progress: state.cpuLoad / 100,
-                color: Theme.loadColor(state.cpuLoad),
-                history: state.cpuLoadHistory,
-                historyRange: 0...100
+            DualLoadCard(
+                cpu: state.cpuLoad,
+                gpu: state.gpuLoad,
+                cpuHistory: state.cpuLoadHistory,
+                gpuHistory: state.gpuLoadHistory
             )
         }
         .padding(.horizontal, 16)
@@ -138,6 +136,71 @@ private struct GaugesRow: View {
     private func tempProgress(_ t: Double?) -> Double {
         guard let t else { return 0 }
         return (t - 30) / (102 - 30)
+    }
+}
+
+// Один индикатор, две метрики: внешнее кольцо — CPU, внутреннее — GPU
+private struct DualLoadCard: View {
+    let cpu: Double
+    let gpu: Double?
+    let cpuHistory: [Double]
+    let gpuHistory: [Double]
+
+    var body: some View {
+        VStack(spacing: 7) {
+            ZStack {
+                GaugeRing(progress: cpu / 100, color: Theme.sky, lineWidth: 4.5)
+                    .frame(width: 58, height: 58)
+                GaugeRing(progress: (gpu ?? 0) / 100, color: Theme.violet, lineWidth: 4)
+                    .frame(width: 42, height: 42)
+                VStack(spacing: -0.5) {
+                    Text("\(Int(cpu.rounded()))")
+                        .foregroundStyle(Theme.sky)
+                    Text(gpu.map { "\(Int($0.rounded()))" } ?? "—")
+                        .foregroundStyle(Theme.violet)
+                }
+                .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.7)
+                .frame(width: 26)
+            }
+            .padding(.top, 2)
+            .animation(.easeOut(duration: 0.7), value: cpu)
+            .animation(.easeOut(duration: 0.7), value: gpu)
+
+            HStack(spacing: 8) {
+                legend("CPU", Theme.sky)
+                legend("GPU", Theme.violet)
+            }
+
+            ZStack {
+                Sparkline(values: cpuHistory, color: Theme.sky, fixedRange: 0...100)
+                Sparkline(values: gpuHistory, color: Theme.violet, fixedRange: 0...100)
+            }
+            .frame(height: 22)
+            .padding(.horizontal, 2)
+        }
+        .padding(.vertical, 11)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Theme.cardFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Theme.cardStroke, lineWidth: 1)
+        )
+    }
+
+    private func legend(_ label: String, _ color: Color) -> some View {
+        HStack(spacing: 2.5) {
+            Circle().fill(color).frame(width: 4, height: 4)
+            Text(label)
+                .font(.system(size: 7.5, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 

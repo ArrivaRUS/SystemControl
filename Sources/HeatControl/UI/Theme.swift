@@ -12,6 +12,7 @@ enum Theme {
     static let red = Color(red: 1.0, green: 0.25, blue: 0.21)
     static let mint = Color(red: 0.26, green: 0.83, blue: 0.71)
     static let sky = Color(red: 0.36, green: 0.66, blue: 1.0)
+    static let violet = Color(red: 0.69, green: 0.51, blue: 1.0)
 
     static let cardFill = Color.white.opacity(0.040)
     static let cardStroke = Color.white.opacity(0.065)
@@ -25,11 +26,6 @@ enum Theme {
         colors: [amber, ember, red],
         startPoint: .top, endPoint: .bottom
     )
-    static let loadGradient = LinearGradient(
-        colors: [sky, Color(red: 0.55, green: 0.45, blue: 1.0)],
-        startPoint: .leading, endPoint: .trailing
-    )
-
     // MARK: - Цвет по температуре (плавная интерполяция между стопами)
 
     private static let tempStops: [(t: Double, c: (Double, Double, Double))] = [
@@ -53,10 +49,6 @@ enum Theme {
             ))
         }
         return rgb(stops[stops.count - 1].c)
-    }
-
-    static func loadColor(_ percent: Double) -> Color {
-        percent > 85 ? red : (percent > 60 ? amber : sky)
     }
 
     private static func rgb(_ c: (Double, Double, Double)) -> Color {

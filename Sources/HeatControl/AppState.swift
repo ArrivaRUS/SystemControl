@@ -17,6 +17,8 @@ final class AppState: ObservableObject {
     @Published var gpuTempHistory: [Double] = []
     @Published var cpuLoad: Double = 0
     @Published var cpuLoadHistory: [Double] = []
+    @Published var gpuLoad: Double?
+    @Published var gpuLoadHistory: [Double] = []
     @Published var sensors: [ThermalSensor] = []
     @Published var processCount: Int = 0
     @Published var historyDepth: TimeInterval = 0
@@ -50,6 +52,7 @@ final class AppState: ObservableObject {
     nonisolated private let sampler = ProcessSampler()
     nonisolated private let thermals = ThermalReader()
     nonisolated private let load = SystemLoad()
+    nonisolated private let gpuMeter = GPULoad()
     nonisolated private let queue = DispatchQueue(label: "heatcontrol.sampler", qos: .utility)
     private var timer: DispatchSourceTimer?
     private var killMessageTask: Task<Void, Never>?
@@ -83,6 +86,7 @@ final class AppState: ObservableObject {
         let sensorList = thermals.readAll()
         let (cpu, gpu) = thermals.summary(from: sensorList)
         let loadValue = load.sample()
+        let gpuLoadValue = gpuMeter.sample()
         let defaults = UserDefaults.standard
         let storedWindow = defaults.double(forKey: "windowSeconds")
         let window = storedWindow > 0 ? storedWindow : 60
@@ -93,12 +97,14 @@ final class AppState: ObservableObject {
 
         Task { @MainActor [weak self] in
             self?.publish(top: top, count: count, depth: depth,
-                          sensors: sensorList, cpu: cpu, gpu: gpu, load: loadValue)
+                          sensors: sensorList, cpu: cpu, gpu: gpu,
+                          load: loadValue, gpuLoad: gpuLoadValue)
         }
     }
 
     private func publish(top: [EnergyEntry], count: Int, depth: TimeInterval,
-                         sensors: [ThermalSensor], cpu: Double?, gpu: Double?, load: Double?) {
+                         sensors: [ThermalSensor], cpu: Double?, gpu: Double?,
+                         load: Double?, gpuLoad gpuLoadValue: Double?) {
         entries = top
         processCount = count
         historyDepth = depth
@@ -106,9 +112,11 @@ final class AppState: ObservableObject {
         if let cpu { cpuTemp = Self.smooth(cpuTemp, cpu) }
         if let gpu { gpuTemp = Self.smooth(gpuTemp, gpu) }
         if let load { cpuLoad = Self.smooth(cpuLoad, load) }
+        if let gpuLoadValue { gpuLoad = Self.smooth(gpuLoad, gpuLoadValue) }
         Self.push(&cpuTempHistory, cpuTemp)
         Self.push(&gpuTempHistory, gpuTemp)
         Self.push(&cpuLoadHistory, load == nil ? nil : cpuLoad)
+        Self.push(&gpuLoadHistory, gpuLoadValue == nil ? nil : gpuLoad)
     }
 
     private static func push(_ array: inout [Double], _ value: Double?) {

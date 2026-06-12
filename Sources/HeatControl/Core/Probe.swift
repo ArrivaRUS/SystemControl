@@ -28,6 +28,7 @@ func runProbe() {
     print("== Sampling processes (3s) ==")
     let sampler = ProcessSampler()
     let loadMeter = SystemLoad()
+    let gpuMeter = GPULoad()
     _ = loadMeter.sample()
     for _ in 0..<4 {
         sampler.sample()
@@ -35,7 +36,11 @@ func runProbe() {
     }
     sampler.sample()
     let cpuLoad = loadMeter.sample() ?? 0
-    print(String(format: "  total CPU load: %.1f%%   processes: %d", cpuLoad, sampler.processCount))
+    let gpuLoad = gpuMeter.sample()
+    print(String(format: "  total CPU load: %.1f%%   GPU load: %@   processes: %d",
+                 cpuLoad,
+                 gpuLoad.map { String(format: "%.1f%%", $0) } ?? "n/a",
+                 sampler.processCount))
     print()
 
     print("== Top apps (grouped) ==")

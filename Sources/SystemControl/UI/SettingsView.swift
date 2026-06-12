@@ -64,8 +64,8 @@ struct SettingsView: View {
                         )
                         divider
                         toggleRow(
-                            icon: "bolt.badge.clock",
-                            title: "Charging power & runtime in menu bar",
+                            icon: "bolt.fill",
+                            title: "Power draw in menu bar (on AC)",
                             isOn: $state.menuBarShowsPower
                         )
                         divider

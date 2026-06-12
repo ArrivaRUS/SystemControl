@@ -62,10 +62,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-// Лейбл в menu bar: 🔥62°  ⚡38W ↑0:42  ↓6:05
+// Лейбл в menu bar: 🔥62° ⚡96W
 //  • температура CPU — всегда (если включена)
-//  • при зарядке — мощность зарядки и прогноз до полного
-//  • всегда — прогноз времени работы от батареи при текущем потреблении
+//  • на внешнем питании — мощность, потребляемая от адаптера
 struct MenuBarLabel: View {
     @EnvironmentObject var state: AppState
 
@@ -75,21 +74,11 @@ struct MenuBarLabel: View {
             if state.menuBarShowsTemp, let t = state.cpuTemp {
                 segment("\(Int(t.rounded()))°")
             }
-            if state.menuBarShowsPower, let b = state.menuBattery {
-                if b.charging {
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 9, weight: .bold))
-                    if let w = b.chargeWatts {
-                        segment("\(w)W")
-                    }
-                    if let full = b.toFullMin {
-                        segment("↑\(hhmm(full))")
-                    }
-                }
-                if let empty = b.toEmptyMin {
-                    segment("↓\(hhmm(empty))")
-                        .opacity(0.85)
-                }
+            if state.menuBarShowsPower, let b = state.menuBattery,
+               b.plugged, let w = b.watts {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 9, weight: .bold))
+                segment("\(w)W")
             }
         }
     }
@@ -98,9 +87,5 @@ struct MenuBarLabel: View {
         Text(text)
             .font(.system(size: 12, weight: .semibold, design: .rounded))
             .monospacedDigit()
-    }
-
-    private func hhmm(_ minutes: Int) -> String {
-        "\(minutes / 60):" + String(format: "%02d", minutes % 60)
     }
 }

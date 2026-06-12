@@ -53,6 +53,7 @@ func runProbe() {
         if b.externalConnected {
             print("  adapter: \(b.adapterName ?? "?") · \(b.adapterWatts ?? 0)W")
         }
+        print("  manufactured: \(b.manufactureText ?? "n/a")   vendor: \(b.vendorText ?? "n/a")")
         print(String(format: "  load (EMA): %@   est. runtime: %@   smc timer: %@",
                      b.systemLoadWatts.map { String(format: "%.1fW", $0) } ?? "n/a",
                      b.estEmptyMinutes.map { "\($0 / 60):" + String(format: "%02d", $0 % 60) } ?? "n/a",

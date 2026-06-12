@@ -260,6 +260,12 @@ private struct DetailsCard: View {
             detail("Charge now", "\(b.currentCapacitymAh.formatted()) mAh")
             detail("Full charge capacity", "\(b.fullChargeCapacitymAh.formatted()) mAh")
             detail("Design capacity", "\(b.designCapacitymAh.formatted()) mAh")
+            if let m = b.manufactureText {
+                detail("Manufactured", m)
+            }
+            if let v = b.vendorText {
+                detail("Cell vendor", v)
+            }
             detail("Gauge chip", b.deviceName)
             detail("Serial", b.serial)
         }

@@ -30,6 +30,9 @@ struct BatteryInfo: Equatable {
     var systemLoadWatts: Double?     // потребление самой системы (без заряда батареи)
     var estEmptyMinutes: Int?        // прогноз до разряда при текущем потреблении
 
+    var manufactureText: String?     // декодированная дата производства
+    var vendorText: String?          // производитель ячеек
+
     var serial: String
     var deviceName: String
 
@@ -42,23 +45,16 @@ struct BatteryInfo: Equatable {
 
 // Грубая сводка для menu bar: сильное квантование, чтобы скрытое UI-дерево
 // не перерисовывалось из-за мелких колебаний значений на каждом тике.
+// На внешнем питании watts = потребление от адаптера (включая зарядку батареи).
 struct MenuBatterySummary: Equatable {
     var plugged: Bool
-    var charging: Bool
-    var chargeWatts: Int?   // мощность зарядки — только пока заряжается
-    var toFullMin: Int?     // прогноз до полного заряда, шаг 5 мин
-    var toEmptyMin: Int?    // прогноз до разряда при текущем потреблении, шаг 5 мин
+    var watts: Int?
 
     init(_ b: BatteryInfo) {
         plugged = b.externalConnected
-        charging = b.isCharging
-        chargeWatts = (b.isCharging && b.batteryWatts > 0.5) ? Int(b.batteryWatts.rounded()) : nil
-        toFullMin = b.isCharging ? b.timeRemainingMinutes.map(Self.coarse) : nil
-        toEmptyMin = b.estEmptyMinutes.map(Self.coarse)
-    }
-
-    private static func coarse(_ minutes: Int) -> Int {
-        max(5, (minutes + 2) / 5 * 5)
+        watts = b.externalConnected
+            ? b.systemWatts.map { max(1, Int($0.rounded())) }
+            : nil
     }
 }
 
@@ -152,6 +148,8 @@ final class BatteryReader: @unchecked Sendable {
             }
         }
 
+        let (manufactureText, vendorText) = Self.parseManufacturing(dict)
+
         var adapterWatts: Int?
         var adapterName: String?
         var adapterVolts: Double?
@@ -188,8 +186,84 @@ final class BatteryReader: @unchecked Sendable {
             adapterAmps: adapterAmps,
             systemLoadWatts: emaLoadWatts.map { ($0 * 10).rounded() / 10 },
             estEmptyMinutes: estEmpty,
+            manufactureText: manufactureText,
+            vendorText: vendorText,
             serial: dict["Serial"] as? String ?? "—",
             deviceName: dict["DeviceName"] as? String ?? "—"
         )
+    }
+
+    // MARK: - Дата производства (формат недокументирован — подстраиваемся)
+
+    // Известные коды производителей ячеек в MfgData
+    private static let vendors: [String: String] = [
+        "COS": "CosMX", "ATL": "ATL", "SUN": "Sunwoda", "SWD": "Sunwoda",
+        "SDI": "Samsung SDI", "LGC": "LG Chem", "SMP": "SMP", "DSY": "Desay",
+    ]
+
+    /// Источники по убыванию надёжности:
+    ///  1) Intel: 16-бит SBS-дата (день|месяц|год-1980) в top-level ManufactureDate.
+    ///  2) Apple Silicon: ASCII-коды в BatteryData.MfgData, напр. "3514","00A","COS"
+    ///     (наблюдение на M4 Max 2024 г.). "3514" трактуем как WWDY:
+    ///     неделя 35, день 1, год …4 → ≈ конец августа 2024 — сходится
+    ///     со сроком сборки машины. Если формат изменится — покажем сырой код.
+    private static func parseManufacturing(_ dict: [String: Any]) -> (date: String?, vendor: String?) {
+        // Intel / SBS
+        if let raw = dict["ManufactureDate"] as? Int, raw > 0, raw <= 0xFFFF {
+            let year = 1980 + (raw >> 9)
+            let month = (raw >> 5) & 0xF
+            let day = raw & 0x1F
+            if (2000...2040).contains(year), (1...12).contains(month), (1...31).contains(day) {
+                return (String(format: "%02d.%02d.%d", day, month, year), nil)
+            }
+        }
+
+        guard let batteryData = dict["BatteryData"] as? [String: Any],
+              let mfg = batteryData["MfgData"] as? Data else { return (nil, nil) }
+
+        // Печатные ASCII-последовательности из блоба
+        var strings: [String] = []
+        var current = ""
+        for byte in mfg {
+            if (0x30...0x7A).contains(byte) {
+                current.append(Character(UnicodeScalar(byte)))
+            } else {
+                if current.count >= 3 { strings.append(current) }
+                current = ""
+            }
+        }
+        if current.count >= 3 { strings.append(current) }
+
+        let vendor = strings.compactMap { vendors[$0.uppercased()] }.first
+        let code = strings.first { $0.count == 4 && $0.allSatisfy(\.isNumber) }
+        let date = code.flatMap(decodeWWDY) ?? code.map { "code \($0)" }
+        return (date, vendor)
+    }
+
+    /// "3514" → неделя 35, день 1, год с последней цифрой 4 (ближайший прошедший)
+    private static func decodeWWDY(_ code: String) -> String? {
+        let digits = Array(code).compactMap { $0.wholeNumberValue }
+        guard digits.count == 4 else { return nil }
+        let week = digits[0] * 10 + digits[1]
+        let day = digits[2]
+        let yearDigit = digits[3]
+        guard (1...53).contains(week), (1...7).contains(day) else { return nil }
+
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let currentYear = calendar.component(.year, from: Date())
+        var year = currentYear - (((currentYear - yearDigit) % 10) + 10) % 10
+        if year > currentYear { year -= 10 }
+
+        var comps = DateComponents()
+        comps.yearForWeekOfYear = year
+        comps.weekOfYear = week
+        comps.weekday = day == 7 ? 1 : day + 1 // 1=Пн в коде → weekday Calendar
+        guard let date = calendar.date(from: comps) else { return nil }
+
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US")
+        fmt.dateFormat = "MMM yyyy"
+        return "≈ \(fmt.string(from: date)) · wk \(week)"
     }
 }

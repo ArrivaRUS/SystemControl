@@ -294,8 +294,8 @@ private struct DetailsCard: View {
             if let v = b.vendorText {
                 detail("Cell vendor", v)
             }
-            detail("Gauge chip", b.deviceName)
-            detail("Serial", b.serial)
+            // Чип и серийник — в одну строку, чтобы раздел влезал без прокрутки
+            detail("Chip · serial", "\(b.deviceName) · \(b.serial)")
         }
         .padding(11)
         .background(

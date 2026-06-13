@@ -11,7 +11,7 @@ struct MainPanelView: View {
     @State private var showSettings = false
     @State private var tab: PanelTab
 
-    static let panelSize = CGSize(width: 376, height: 568)
+    static let panelSize = CGSize(width: 376, height: 600)
 
     init(isFloating: Bool, initialTab: PanelTab = .energy) {
         self.isFloating = isFloating

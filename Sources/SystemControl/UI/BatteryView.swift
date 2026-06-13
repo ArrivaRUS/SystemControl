@@ -188,9 +188,10 @@ private struct ElectricalCard: View {
 
     var body: some View {
         VStack(spacing: 7) {
-            row(icon: "gauge.with.dots.needle.50percent", label: "System power",
-                value: b.systemWatts.map { String(format: "%.1f W", $0) } ?? "—",
-                valueColor: .primary)
+            // Потребление системы + (на зарядке) сколько уходит в батарею.
+            // На батарее эти две величины совпадают по модулю, поэтому
+            // чип показываем только при зарядке, когда числа реально разные.
+            powerRow
             // Прогноз времени работы — только когда реально работаем от батареи
             if !b.externalConnected {
                 divider
@@ -198,10 +199,6 @@ private struct ElectricalCard: View {
                     value: b.estEmptyMinutes.map { "\($0 / 60):" + String(format: "%02d", $0 % 60) } ?? "—",
                     valueColor: .primary)
             }
-            divider
-            row(icon: "battery.100percent", label: "Battery power",
-                value: String(format: "%+.1f W", b.batteryWatts),
-                valueColor: b.batteryWatts < -0.05 ? Theme.amber : (b.batteryWatts > 0.05 ? Theme.mint : .secondary))
             divider
             row(icon: "bolt.horizontal", label: "Voltage · Amperage",
                 value: String(format: "%.2f V · %+.2f A", b.voltage, b.amperage),
@@ -233,6 +230,34 @@ private struct ElectricalCard: View {
 
     private var divider: some View {
         Rectangle().fill(Theme.hairline).frame(height: 1)
+    }
+
+    // Объединённая строка мощности: потребление системы + чип зарядки
+    private var powerRow: some View {
+        let charging = b.externalConnected && b.batteryWatts > 0.5
+        return HStack(spacing: 8) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Theme.amber)
+                .frame(width: 16)
+            Text(b.externalConnected ? "Power draw" : "Power · on battery")
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(.primary.opacity(0.85))
+            Spacer()
+            if charging {
+                Text("\(Int(b.batteryWatts.rounded())) W → battery")
+                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.mint)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Theme.mint.opacity(0.13)))
+            }
+            Text(b.systemWatts.map { String(format: "%.1f W", $0) } ?? "—")
+                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(b.externalConnected ? .primary : Theme.amber)
+        }
     }
 
     private func row(icon: String, label: String, value: String, valueColor: Color) -> some View {

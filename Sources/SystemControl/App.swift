@@ -62,29 +62,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-// Лейбл в menu bar: 🔥62° ⚡96W
-//  • температура CPU — всегда (если включена)
-//  • на внешнем питании — мощность, потребляемая от адаптера
-// Всё собрано в ОДИН составной Text: статус-айтем MenuBarExtra не
-// пересчитывает ширину для появившихся позже соседних view (контент
-// обрезается при переходе батарея → провод), а одиночный Text — ресайзит.
+// Лейбл в menu bar:
+//   одно значение  →  🔥62°  (одна строка, крупный шрифт)
+//   два значения   →  🔥62°  (две строки, мелкий шрифт: градусы сверху,
+//                      ⚡96W    ваты снизу)
+// Всё собрано в ОДИН составной Text (строки разделены \n): статус-айтем
+// MenuBarExtra не пересчитывает ширину для появившихся позже соседних
+// view (контент обрезается при переходе батарея → провод), а одиночный
+// Text ресайзится корректно — и в одну строку, и в две.
 struct MenuBarLabel: View {
     @EnvironmentObject var state: AppState
 
-    var body: some View {
-        composed
-            .font(.system(size: 12, weight: .semibold, design: .rounded))
-            .monospacedDigit()
+    private var tempText: String? {
+        guard state.menuBarShowsTemp, let t = state.cpuTemp else { return nil }
+        return "\(Int(t.rounded()))°"
+    }
+    private var wattsText: String? {
+        guard state.menuBarShowsPower, let b = state.menuBattery,
+              b.plugged, let w = b.watts else { return nil }
+        return "\(w)W"
     }
 
-    private var composed: Text {
-        var result = Text(Image(systemName: "flame.fill"))
-        if state.menuBarShowsTemp, let t = state.cpuTemp {
-            result = result + Text(" \(Int(t.rounded()))°")
+    var body: some View {
+        let temp = tempText
+        let watts = wattsText
+        let twoLine = (temp != nil && watts != nil)
+        return label(temp: temp, watts: watts, twoLine: twoLine)
+            .font(.system(size: twoLine ? 9 : 12, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .multilineTextAlignment(.trailing)
+    }
+
+    private func label(temp: String?, watts: String?, twoLine: Bool) -> Text {
+        if let temp, let watts {
+            // Две строки одним Text — корректный ресайз ширины
+            return Text(Image(systemName: "flame.fill")) + Text(" \(temp)\n")
+                 + Text(Image(systemName: "bolt.fill")) + Text(" \(watts)")
         }
-        if state.menuBarShowsPower, let b = state.menuBattery,
-           b.plugged, let w = b.watts {
-            result = result + Text("  ") + Text(Image(systemName: "bolt.fill")) + Text("\(w)W")
+        var result = Text(Image(systemName: "flame.fill"))
+        if let temp {
+            result = result + Text(" \(temp)")
+        } else if let watts {
+            result = result + Text(" ") + Text(Image(systemName: "bolt.fill")) + Text(" \(watts)")
         }
         return result
     }

@@ -50,10 +50,11 @@ enum MenuBarRenderer {
         // На пункт крупнее energy-режима + увеличенные иконки
         let size = (H / 2) * 0.84
 
-        // Батарейка: ободок — адаптивный labelColor (белый на тёмном баре),
-        // цветной только бар-заливка внутри
+        // Батарейка: палитра символа — [заливка, контур] (проверено: palette[0]
+        // красит бар внутри, palette[1] — корпус). Контур — адаптивный
+        // labelColor (белый на тёмном баре), цветной только бар-заливка.
         let fill = batteryColor(percent: b.percent, charging: b.charging, full: b.fullyCharged)
-        let top = line([.symbol(batteryGlyph(percent: b.percent), [.labelColor, fill]),
+        let top = line([.symbol(batteryGlyph(percent: b.percent), [fill, .labelColor]),
                         .text("\(b.percent)%", .labelColor)],
                        size: size, symbolScale: 1.12)
 

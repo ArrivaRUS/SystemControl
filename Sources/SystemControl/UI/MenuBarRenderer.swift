@@ -24,11 +24,12 @@ enum MenuBarRenderer {
                 line([.symbol("bolt.fill"), .text(watts)], size: size),
             ]
         } else if let temp {
-            lines = [line([.symbol("flame.fill"), .text(temp)], size: H * 0.50)]
+            // Одна строка — высота свободна, делаем заметно крупнее
+            lines = [line([.symbol("flame.fill"), .text(temp)], size: H * 0.66)]
         } else if let watts {
-            lines = [line([.symbol("flame.fill"), .symbol("bolt.fill"), .text(watts)], size: H * 0.50)]
+            lines = [line([.symbol("flame.fill"), .symbol("bolt.fill"), .text(watts)], size: H * 0.64)]
         } else {
-            lines = [line([.symbol("flame.fill")], size: H * 0.52)]
+            lines = [line([.symbol("flame.fill")], size: H * 0.64)]
         }
 
         let sizes = lines.map { $0.size() }

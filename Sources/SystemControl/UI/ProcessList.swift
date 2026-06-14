@@ -34,7 +34,11 @@ struct ProcessListView: View {
                         .padding(.top, 70)
                 } else {
                     let maxCpu = state.entries.map(\.cpuPercent).max() ?? 1
-                    ForEach(Array(state.entries.enumerated()), id: \.element.id) { index, entry in
+                    // В снапшоте нет прокрутки — показываем столько строк,
+                    // сколько реально помещается в окно (как до скролла),
+                    // иначе контент вылезает за 600pt и обрезается сверху/снизу
+                    let shown = Self.snapshotMode ? Array(state.entries.prefix(8)) : state.entries
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { index, entry in
                         ProcessRow(
                             entry: entry,
                             rank: index + 1,

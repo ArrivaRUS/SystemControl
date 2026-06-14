@@ -129,7 +129,7 @@ struct SettingsView: View {
                     }
 
                     VStack(spacing: 2) {
-                        Text("System Control 1.2 · by Alex Kovalev")
+                        Text("System Control 1.2.1 · by Alex Kovalev")
                         Text("Energy is CPU time averaged over the window")
                     }
                     .font(.system(size: 8.5))

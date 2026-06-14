@@ -34,6 +34,7 @@ func runSnapshot(to path: String) {
     let label = MenuBarLabel()
         .environmentObject(state)
         .environment(\.colorScheme, .dark)
+        .foregroundStyle(.white) // template-картинка тинтуется в белый для превью
         .padding(8)
         .background(Color.black)
     render(label, to: (path as NSString).deletingPathExtension + "_label.png")

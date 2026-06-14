@@ -66,10 +66,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 //   одно значение  →  🔥62°  (одна строка, крупный шрифт)
 //   два значения   →  🔥62°  (две строки, мелкий шрифт: градусы сверху,
 //                      ⚡96W    ваты снизу)
-// Всё собрано в ОДИН составной Text (строки разделены \n): статус-айтем
-// MenuBarExtra не пересчитывает ширину для появившихся позже соседних
-// view (контент обрезается при переходе батарея → провод), а одиночный
-// Text ресайзится корректно — и в одну строку, и в две.
+// Рисуется как NSImage точно по высоте строки меню (см. MenuBarRenderer):
+// многострочный SwiftUI-текст MenuBarExtra не умещает в толщину бара и
+// обрезает; NSImage нужной высоты раскладывается без обрезки и пустот.
 struct MenuBarLabel: View {
     @EnvironmentObject var state: AppState
 
@@ -84,27 +83,7 @@ struct MenuBarLabel: View {
     }
 
     var body: some View {
-        let temp = tempText
-        let watts = wattsText
-        let twoLine = (temp != nil && watts != nil)
-        return label(temp: temp, watts: watts, twoLine: twoLine)
-            .font(.system(size: twoLine ? 9 : 12, weight: .semibold, design: .rounded))
-            .monospacedDigit()
-            .multilineTextAlignment(.trailing)
-    }
-
-    private func label(temp: String?, watts: String?, twoLine: Bool) -> Text {
-        if let temp, let watts {
-            // Две строки одним Text — корректный ресайз ширины
-            return Text(Image(systemName: "flame.fill")) + Text(" \(temp)\n")
-                 + Text(Image(systemName: "bolt.fill")) + Text(" \(watts)")
-        }
-        var result = Text(Image(systemName: "flame.fill"))
-        if let temp {
-            result = result + Text(" \(temp)")
-        } else if let watts {
-            result = result + Text(" ") + Text(Image(systemName: "bolt.fill")) + Text(" \(watts)")
-        }
-        return result
+        Image(nsImage: MenuBarRenderer.image(temp: tempText, watts: wattsText))
+            .renderingMode(.template)
     }
 }

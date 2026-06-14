@@ -4,11 +4,15 @@ import AppKit
 // SwiftUI-текст (тем более многострочный) в MenuBarExtra не масштабируется
 // под толщину бара и обрезается; NSImage нужной высоты решает это — мы сами
 // раскладываем одну или две строки внутри известной высоты.
+//
+// Energy-режим — template (монохром, тинтуется системой под тему бара).
+// Battery-режим — цветной (non-template): батарейка зелёная/жёлтая/красная,
+// молния жёлтая; текст в адаптивном labelColor, чтобы читался на любой теме.
 enum MenuBarRenderer {
 
     private enum Seg {
-        case symbol(String)
-        case text(String)
+        case symbol(String, NSColor?)   // цвет nil → монохром (template)
+        case text(String, NSColor?)
     }
 
     private static var barHeight: CGFloat {
@@ -16,36 +20,38 @@ enum MenuBarRenderer {
         return t > 1 ? t : 22
     }
 
-    // Вкладка Energy: температура CPU и (на питании) ваты от адаптера.
+    // MARK: - Energy: температура CPU и (на питании) ваты от адаптера
+
     static func image(temp: String?, watts: String?) -> NSImage {
         let H = barHeight
         let lines: [NSAttributedString]
         if let temp, let watts {
-            // Две строки: градусы сверху, ваты снизу — шрифт под половину высоты
             let size = (H / 2) * 0.80
             lines = [
-                line([.symbol("flame.fill"), .text(temp)], size: size),
-                line([.symbol("bolt.fill"), .text(watts)], size: size),
+                line([.symbol("flame.fill", nil), .text(temp, nil)], size: size),
+                line([.symbol("bolt.fill", nil), .text(watts, nil)], size: size),
             ]
         } else if let temp {
-            // Одна строка — высота свободна, делаем заметно крупнее
-            lines = [line([.symbol("flame.fill"), .text(temp)], size: H * 0.66)]
+            lines = [line([.symbol("flame.fill", nil), .text(temp, nil)], size: H * 0.66)]
         } else if let watts {
-            lines = [line([.symbol("flame.fill"), .symbol("bolt.fill"), .text(watts)], size: H * 0.64)]
+            lines = [line([.symbol("flame.fill", nil), .symbol("bolt.fill", nil), .text(watts, nil)], size: H * 0.64)]
         } else {
-            lines = [line([.symbol("flame.fill")], size: H * 0.64)]
+            lines = [line([.symbol("flame.fill", nil)], size: H * 0.64)]
         }
-        return layout(lines)
+        return layout(lines, centered: false, template: true)
     }
 
-    // Вкладка Battery: процент сверху, время снизу (до полного на питании /
-    // до разряда на батарее).
+    // MARK: - Battery: процент сверху, время снизу
+
     static func batteryImage(_ b: MenuBatterySummary) -> NSImage {
         let H = barHeight
-        let size = (H / 2) * 0.80
+        // На пункт крупнее energy-режима + увеличенные иконки
+        let size = (H / 2) * 0.84
 
-        let topGlyph = batteryGlyph(percent: b.percent)
-        let top = line([.symbol(topGlyph), .text("\(b.percent)%")], size: size)
+        let battColor = batteryColor(percent: b.percent, charging: b.charging, full: b.fullyCharged)
+        let top = line([.symbol(batteryGlyph(percent: b.percent), battColor),
+                        .text("\(b.percent)%", .labelColor)],
+                       size: size, symbolScale: 1.12)
 
         let bottomText: String
         if b.plugged {
@@ -54,14 +60,18 @@ enum MenuBarRenderer {
             bottomText = b.timeMinutes.map(hhmm) ?? "—"
         }
         let bottomGlyph = b.plugged ? "bolt.fill" : "hourglass"
-        let bottom = line([.symbol(bottomGlyph), .text(bottomText)], size: size)
+        let glyphColor: NSColor = b.plugged
+            ? (b.fullyCharged ? .systemGreen : .systemYellow)   // молния жёлтая, на полном — зелёная
+            : (b.percent < 20 ? .systemRed : .secondaryLabelColor)
+        let bottom = line([.symbol(bottomGlyph, glyphColor), .text(bottomText, .labelColor)],
+                          size: size, symbolScale: 1.12)
 
-        return layout([top, bottom])
+        return layout([top, bottom], centered: true, template: false)
     }
 
     // MARK: - Раскладка строк в NSImage точно по высоте бара
 
-    private static func layout(_ lines: [NSAttributedString]) -> NSImage {
+    private static func layout(_ lines: [NSAttributedString], centered: Bool, template: Bool) -> NSImage {
         let H = barHeight
         let sizes = lines.map { $0.size() }
         let width = ceil((sizes.map(\.width).max() ?? 8)) + 2
@@ -72,7 +82,7 @@ enum MenuBarRenderer {
                 for (i, ln) in lines.enumerated() {
                     let s = sizes[i]
                     let bandY = (i == 0) ? band : 0           // строка 0 — верхняя
-                    let x = width - s.width                   // выравнивание по правому краю
+                    let x = centered ? (width - s.width) / 2 : (width - s.width)
                     let y = bandY + (band - s.height) / 2
                     ln.draw(at: NSPoint(x: x, y: y))
                 }
@@ -82,7 +92,7 @@ enum MenuBarRenderer {
             }
             return true
         }
-        image.isTemplate = true // тинтуется под светлый/тёмный menu bar
+        image.isTemplate = template
         return image
     }
 
@@ -100,6 +110,12 @@ enum MenuBarRenderer {
         }
     }
 
+    private static func batteryColor(percent: Int, charging: Bool, full: Bool) -> NSColor {
+        if percent < 20 { return .systemRed }
+        if charging { return .systemYellow }   // промежуточный — заряжается
+        return .systemGreen                     // здоровый заряд / полный
+    }
+
     // MARK: -
 
     private static func roundedFont(_ size: CGFloat) -> NSFont {
@@ -110,29 +126,30 @@ enum MenuBarRenderer {
         return base
     }
 
-    private static func line(_ segs: [Seg], size: CGFloat) -> NSAttributedString {
+    private static func line(_ segs: [Seg], size: CGFloat, symbolScale: CGFloat = 0.95) -> NSAttributedString {
         let font = roundedFont(size)
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: NSColor.black, // для template важна только альфа
-        ]
         let out = NSMutableAttributedString()
         for seg in segs {
             switch seg {
-            case .text(let t):
-                out.append(NSAttributedString(string: t, attributes: attrs))
-            case .symbol(let name):
-                let cfg = NSImage.SymbolConfiguration(pointSize: size * 0.95, weight: .semibold)
+            case .text(let t, let color):
+                out.append(NSAttributedString(string: t, attributes: [
+                    .font: font,
+                    .foregroundColor: color ?? NSColor.black,
+                ]))
+            case .symbol(let name, let color):
+                var cfg = NSImage.SymbolConfiguration(pointSize: size * symbolScale, weight: .semibold)
+                if let color {
+                    cfg = cfg.applying(.init(paletteColors: [color]))
+                }
                 guard let img = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
                     .withSymbolConfiguration(cfg) else { continue }
                 let att = NSTextAttachment()
                 att.image = img
                 let h = img.size.height
-                // центрируем символ по высоте прописных
                 att.bounds = CGRect(x: 0, y: (font.capHeight - h) / 2,
                                     width: img.size.width, height: h)
                 out.append(NSAttributedString(attachment: att))
-                out.append(NSAttributedString(string: " ", attributes: attrs))
+                out.append(NSAttributedString(string: " ", attributes: [.font: font]))
             }
         }
         return out

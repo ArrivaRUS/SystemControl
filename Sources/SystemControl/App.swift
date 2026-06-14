@@ -83,15 +83,13 @@ struct MenuBarLabel: View {
     }
 
     var body: some View {
-        Image(nsImage: labelImage)
-            .renderingMode(.template)
-    }
-
-    private var labelImage: NSImage {
-        // На вкладке Battery трей показывает заряд и время; иначе — темп/ваты
+        // Battery-режим цветной → .original; Energy-режим монохромный → .template
         if state.tab == .battery, let b = state.menuBattery {
-            return MenuBarRenderer.batteryImage(b)
+            Image(nsImage: MenuBarRenderer.batteryImage(b))
+                .renderingMode(.original)
+        } else {
+            Image(nsImage: MenuBarRenderer.image(temp: tempText, watts: wattsText))
+                .renderingMode(.template)
         }
-        return MenuBarRenderer.image(temp: tempText, watts: wattsText)
     }
 }

@@ -26,6 +26,13 @@ final class AppState: ObservableObject {
     @Published var historyDepth: TimeInterval = 0
     @Published var killMessage: String?
 
+    // Выбранная вкладка панели. Лежит в AppState (а не в @State панели),
+    // чтобы её разделяли всплывающая и плавающая панели И чтобы от неё
+    // зависел вид иконки в трее (energy → темп/ваты, battery → %/время).
+    @Published var tab: PanelTab = .energy {
+        didSet { defaults.set(tab == .battery ? "battery" : "energy", forKey: "selectedTab") }
+    }
+
     // MARK: - Настройки (персистентные)
 
     @Published var groupByApps: Bool {
@@ -131,6 +138,7 @@ final class AppState: ObservableObject {
         updateInterval = i > 0 ? i : 2
         menuBarShowsTemp = defaults.object(forKey: "menuBarShowsTemp") as? Bool ?? true
         menuBarShowsPower = defaults.object(forKey: "menuBarShowsPower") as? Bool ?? true
+        tab = defaults.string(forKey: "selectedTab") == "battery" ? .battery : .energy
         restartTimer()
     }
 

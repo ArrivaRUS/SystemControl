@@ -13,15 +13,25 @@ func runSnapshot(to path: String) {
     RunLoop.main.run(until: Date().addingTimeInterval(7))
     print("entries: \(state.entries.count), cpu: \(state.cpuTemp ?? -1), gpu: \(state.gpuTemp ?? -1)")
 
+    state.tab = .energy
     let main = MainPanelView(isFloating: true)
         .environmentObject(state)
         .environment(\.colorScheme, .dark)
     render(main, to: path)
 
-    let battery = MainPanelView(isFloating: true, initialTab: .battery)
+    state.tab = .battery
+    let battery = MainPanelView(isFloating: true)
         .environmentObject(state)
         .environment(\.colorScheme, .dark)
     render(battery, to: (path as NSString).deletingPathExtension + "_battery.png")
+    let batteryLabel = MenuBarLabel()
+        .environmentObject(state)
+        .environment(\.colorScheme, .dark)
+        .foregroundStyle(.white)
+        .padding(8)
+        .background(Color.black)
+    render(batteryLabel, to: (path as NSString).deletingPathExtension + "_label_batt.png")
+    state.tab = .energy
 
     let settings = SettingsView(isPresented: .constant(true))
         .frame(width: MainPanelView.panelSize.width, height: MainPanelView.panelSize.height)

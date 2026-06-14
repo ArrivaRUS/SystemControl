@@ -9,21 +9,24 @@ struct MainPanelView: View {
     let isFloating: Bool
     @EnvironmentObject var state: AppState
     @State private var showSettings = false
-    @State private var tab: PanelTab
 
     static let panelSize = CGSize(width: 376, height: 600)
 
-    init(isFloating: Bool, initialTab: PanelTab = .energy) {
+    init(isFloating: Bool) {
         self.isFloating = isFloating
-        _tab = State(initialValue: initialTab)
+    }
+
+    // Вкладка живёт в AppState — общая для панелей и трея
+    private var tabBinding: Binding<PanelTab> {
+        Binding(get: { state.tab }, set: { state.tab = $0 })
     }
 
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                HeaderBar(isFloating: isFloating, showSettings: $showSettings, tab: $tab)
+                HeaderBar(isFloating: isFloating, showSettings: $showSettings, tab: tabBinding)
                 Group {
-                    if tab == .energy {
+                    if state.tab == .energy {
                         GaugesRow()
                         SectionHeader()
                         ProcessListView()
@@ -31,9 +34,9 @@ struct MainPanelView: View {
                         BatteryView()
                     }
                 }
-                FooterBar(tab: tab)
+                FooterBar(tab: state.tab)
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.9), value: tab)
+            .animation(.spring(response: 0.3, dampingFraction: 0.9), value: state.tab)
 
             if showSettings {
                 SettingsView(isPresented: $showSettings)

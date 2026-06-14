@@ -11,10 +11,14 @@ enum MenuBarRenderer {
         case text(String)
     }
 
-    static func image(temp: String?, watts: String?) -> NSImage {
-        let thickness = NSStatusBar.system.thickness
-        let H = thickness > 1 ? thickness : 22
+    private static var barHeight: CGFloat {
+        let t = NSStatusBar.system.thickness
+        return t > 1 ? t : 22
+    }
 
+    // Вкладка Energy: температура CPU и (на питании) ваты от адаптера.
+    static func image(temp: String?, watts: String?) -> NSImage {
+        let H = barHeight
         let lines: [NSAttributedString]
         if let temp, let watts {
             // Две строки: градусы сверху, ваты снизу — шрифт под половину высоты
@@ -31,7 +35,34 @@ enum MenuBarRenderer {
         } else {
             lines = [line([.symbol("flame.fill")], size: H * 0.64)]
         }
+        return layout(lines)
+    }
 
+    // Вкладка Battery: процент сверху, время снизу (до полного на питании /
+    // до разряда на батарее).
+    static func batteryImage(_ b: MenuBatterySummary) -> NSImage {
+        let H = barHeight
+        let size = (H / 2) * 0.80
+
+        let topGlyph = batteryGlyph(percent: b.percent)
+        let top = line([.symbol(topGlyph), .text("\(b.percent)%")], size: size)
+
+        let bottomText: String
+        if b.plugged {
+            bottomText = b.fullyCharged ? "Full" : (b.timeMinutes.map(hhmm) ?? "—")
+        } else {
+            bottomText = b.timeMinutes.map(hhmm) ?? "—"
+        }
+        let bottomGlyph = b.plugged ? "bolt.fill" : "hourglass"
+        let bottom = line([.symbol(bottomGlyph), .text(bottomText)], size: size)
+
+        return layout([top, bottom])
+    }
+
+    // MARK: - Раскладка строк в NSImage точно по высоте бара
+
+    private static func layout(_ lines: [NSAttributedString]) -> NSImage {
+        let H = barHeight
         let sizes = lines.map { $0.size() }
         let width = ceil((sizes.map(\.width).max() ?? 8)) + 2
 
@@ -53,6 +84,20 @@ enum MenuBarRenderer {
         }
         image.isTemplate = true // тинтуется под светлый/тёмный menu bar
         return image
+    }
+
+    private static func hhmm(_ minutes: Int) -> String {
+        "\(minutes / 60):" + String(format: "%02d", minutes % 60)
+    }
+
+    private static func batteryGlyph(percent: Int) -> String {
+        switch percent {
+        case ..<13: return "battery.0percent"
+        case ..<38: return "battery.25percent"
+        case ..<63: return "battery.50percent"
+        case ..<88: return "battery.75percent"
+        default: return "battery.100percent"
+        }
     }
 
     // MARK: -

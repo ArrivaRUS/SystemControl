@@ -49,12 +49,27 @@ struct BatteryInfo: Equatable {
 struct MenuBatterySummary: Equatable {
     var plugged: Bool
     var watts: Int?
+    var percent: Int
+    var charging: Bool
+    var fullyCharged: Bool
+    // Минуты: до полного заряда (на внешнем питании) или до разряда (на батарее)
+    var timeMinutes: Int?
 
     init(_ b: BatteryInfo) {
         plugged = b.externalConnected
         watts = b.externalConnected
             ? b.systemWatts.map { max(1, Int($0.rounded())) }
             : nil
+        percent = b.percent
+        charging = b.isCharging
+        fullyCharged = b.fullyCharged
+        if b.externalConnected {
+            // На зарядке — прогноз до полного; на холде/полном — нет
+            timeMinutes = b.isCharging ? b.timeRemainingMinutes : nil
+        } else {
+            // На батарее — прогноз до разряда при текущем потреблении
+            timeMinutes = b.estEmptyMinutes
+        }
     }
 }
 

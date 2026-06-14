@@ -129,7 +129,10 @@ struct SettingsView: View {
                     }
 
                     VStack(spacing: 2) {
-                        Text("System Control 1.2.1 · by Alex Kovalev")
+                        HStack(spacing: 0) {
+                            Text("System Control 1.2.1 · by Alex Kovalev · ")
+                            GitHubLink()
+                        }
                         Text("Energy is CPU time averaged over the window")
                     }
                     .font(.system(size: 8.5))
@@ -227,5 +230,23 @@ struct SettingsView: View {
             loginError = error.localizedDescription
             refreshLoginStatus()
         }
+    }
+}
+
+// Кликабельная ссылка «GitHub» в футере — открывает репозиторий в браузере
+private struct GitHubLink: View {
+    static let url = URL(string: "https://github.com/ArrivaRUS/SystemControl")!
+    @State private var hovered = false
+
+    var body: some View {
+        Text("GitHub")
+            .foregroundStyle(hovered ? Theme.sky : Theme.sky.opacity(0.85))
+            .underline(hovered)
+            .onHover { h in
+                hovered = h
+                if h { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .onTapGesture { NSWorkspace.shared.open(Self.url) }
+            .help("Open the project on GitHub")
     }
 }

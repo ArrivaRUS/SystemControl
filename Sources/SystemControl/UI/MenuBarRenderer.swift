@@ -11,7 +11,9 @@ import AppKit
 enum MenuBarRenderer {
 
     private enum Seg {
-        case symbol(String, NSColor?)   // цвет nil → монохром (template)
+        // colors: [] → монохром (template); [c] → единый цвет;
+        // [контур, заливка] → двухслойная палитра (напр. белый ободок + цветной бар)
+        case symbol(String, [NSColor])
         case text(String, NSColor?)
     }
 
@@ -28,15 +30,15 @@ enum MenuBarRenderer {
         if let temp, let watts {
             let size = (H / 2) * 0.80
             lines = [
-                line([.symbol("flame.fill", nil), .text(temp, nil)], size: size),
-                line([.symbol("bolt.fill", nil), .text(watts, nil)], size: size),
+                line([.symbol("flame.fill", []), .text(temp, nil)], size: size),
+                line([.symbol("bolt.fill", []), .text(watts, nil)], size: size),
             ]
         } else if let temp {
-            lines = [line([.symbol("flame.fill", nil), .text(temp, nil)], size: H * 0.66)]
+            lines = [line([.symbol("flame.fill", []), .text(temp, nil)], size: H * 0.66)]
         } else if let watts {
-            lines = [line([.symbol("flame.fill", nil), .symbol("bolt.fill", nil), .text(watts, nil)], size: H * 0.64)]
+            lines = [line([.symbol("flame.fill", []), .symbol("bolt.fill", []), .text(watts, nil)], size: H * 0.64)]
         } else {
-            lines = [line([.symbol("flame.fill", nil)], size: H * 0.64)]
+            lines = [line([.symbol("flame.fill", [])], size: H * 0.64)]
         }
         return layout(lines, centered: false, template: true)
     }
@@ -48,8 +50,10 @@ enum MenuBarRenderer {
         // На пункт крупнее energy-режима + увеличенные иконки
         let size = (H / 2) * 0.84
 
-        let battColor = batteryColor(percent: b.percent, charging: b.charging, full: b.fullyCharged)
-        let top = line([.symbol(batteryGlyph(percent: b.percent), battColor),
+        // Батарейка: ободок — адаптивный labelColor (белый на тёмном баре),
+        // цветной только бар-заливка внутри
+        let fill = batteryColor(percent: b.percent, charging: b.charging, full: b.fullyCharged)
+        let top = line([.symbol(batteryGlyph(percent: b.percent), [.labelColor, fill]),
                         .text("\(b.percent)%", .labelColor)],
                        size: size, symbolScale: 1.12)
 
@@ -63,7 +67,7 @@ enum MenuBarRenderer {
         let glyphColor: NSColor = b.plugged
             ? (b.fullyCharged ? .systemGreen : .systemYellow)   // молния жёлтая, на полном — зелёная
             : (b.percent < 20 ? .systemRed : .secondaryLabelColor)
-        let bottom = line([.symbol(bottomGlyph, glyphColor), .text(bottomText, .labelColor)],
+        let bottom = line([.symbol(bottomGlyph, [glyphColor]), .text(bottomText, .labelColor)],
                           size: size, symbolScale: 1.12)
 
         return layout([top, bottom], centered: true, template: false)
@@ -136,10 +140,10 @@ enum MenuBarRenderer {
                     .font: font,
                     .foregroundColor: color ?? NSColor.black,
                 ]))
-            case .symbol(let name, let color):
+            case .symbol(let name, let colors):
                 var cfg = NSImage.SymbolConfiguration(pointSize: size * symbolScale, weight: .semibold)
-                if let color {
-                    cfg = cfg.applying(.init(paletteColors: [color]))
+                if !colors.isEmpty {
+                    cfg = cfg.applying(.init(paletteColors: colors))
                 }
                 guard let img = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
                     .withSymbolConfiguration(cfg) else { continue }

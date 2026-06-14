@@ -53,7 +53,7 @@ enum MenuBarRenderer {
         // Батарейка: палитра символа — [заливка, контур] (проверено: palette[0]
         // красит бар внутри, palette[1] — корпус). Контур — адаптивный
         // labelColor (белый на тёмном баре), цветной только бар-заливка.
-        let fill = batteryColor(percent: b.percent, charging: b.charging, full: b.fullyCharged)
+        let fill = batteryColor(percent: b.percent)
         let top = line([.symbol(batteryGlyph(percent: b.percent), [fill, .labelColor]),
                         .text("\(b.percent)%", .labelColor)],
                        size: size, symbolScale: 1.12)
@@ -115,10 +115,13 @@ enum MenuBarRenderer {
         }
     }
 
-    private static func batteryColor(percent: Int, charging: Bool, full: Bool) -> NSColor {
-        if percent < 20 { return .systemRed }
-        if charging { return .systemYellow }   // промежуточный — заряжается
-        return .systemGreen                     // здоровый заряд / полный
+    // Цвет заливки — по СТЕПЕНИ заряда, не по процессу зарядки
+    private static func batteryColor(percent: Int) -> NSColor {
+        switch percent {
+        case ..<20: return .systemRed        // низкий заряд
+        case ..<50: return .systemYellow     // средний
+        default: return .systemGreen         // высокий
+        }
     }
 
     // MARK: -

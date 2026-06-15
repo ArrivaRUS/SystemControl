@@ -67,7 +67,7 @@ enum MenuBarRenderer {
         let bottomGlyph = b.plugged ? "bolt.fill" : "hourglass"
         let glyphColor: NSColor = b.plugged
             ? (b.fullyCharged ? .systemGreen : .systemYellow)   // молния жёлтая, на полном — зелёная
-            : (b.percent < 20 ? .systemRed : .secondaryLabelColor)
+            : (b.percent < 20 ? .systemRed : NSColor.labelColor.withAlphaComponent(0.9)) // часы — 90% от label
         let bottom = line([.symbol(bottomGlyph, [glyphColor]), .text(bottomText, .labelColor)],
                           size: size, symbolScale: 1.12)
 

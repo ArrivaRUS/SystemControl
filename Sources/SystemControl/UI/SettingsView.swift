@@ -144,7 +144,7 @@ struct SettingsView: View {
 
                     VStack(spacing: 2) {
                         HStack(spacing: 0) {
-                            Text("System Control 1.2.3 · by Alex Kovalev · ")
+                            Text("System Control 1.2.4 · by Alex Kovalev · ")
                             GitHubLink()
                         }
                         Text("Energy is CPU time averaged over the window")

@@ -34,8 +34,10 @@ A native macOS menu bar utility that shows **what is burning energy and heating 
 - **CPU & GPU temperatures** with ring gauges and history sparklines.
   The color shifts from mint (cool) to crimson (critical).
 - **CPU and GPU load on one dual-ring gauge** — outer ring is CPU, inner is GPU.
-- **Live status in the menu bar**: CPU temperature, and on AC power — the wattage
-  drawn from the adapter (⚡96W). Each element can be switched off in settings.
+- **Live status in the menu bar** — pick what the Energy tab shows: CPU temperature,
+  or CPU/GPU load as level-colored history bars (green → red, ~5 min), or both stacked;
+  plus power draw on AC. On the Battery tab the menu bar shows charge % and time
+  to full / to empty.
 - **Always-on-top mode** — 📌 pins the panel as a floating window that stays above
   all windows in every Space. Close with Esc or 📌.
 - **Battery tab** — coconutBattery-style health & usage: charge, health
@@ -48,7 +50,7 @@ A native macOS menu bar utility that shows **what is burning energy and heating 
 
 ### Download
 
-**[SystemControl-1.2.3.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
+**[SystemControl-1.2.4.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
 open the image and drag `System Control` to `Applications`.
 
 The app is ad-hoc signed (not notarized), so on first launch:
@@ -124,9 +126,10 @@ swift -e 'import Foundation; DistributedNotificationCenter.default().postNotific
   Цвет меняется от мятного (прохладно) до малинового (критично).
 - **Загрузка CPU и GPU на одном сдвоенном индикаторе** — внешнее кольцо CPU,
   внутреннее GPU, с общей историей.
-- **Живой статус прямо в menu bar**: температура CPU, а на внешнем питании —
-  мощность, потребляемая от адаптера (⚡96W). Каждый элемент отключается
-  в настройках.
+- **Живой статус прямо в menu bar** — выбираешь, что показывать на вкладке Energy:
+  температуру CPU, либо загрузку CPU/GPU столбиками истории с цветом по уровню
+  (зелёный → красный, ~5 мин), либо оба графика друг над другом; плюс мощность
+  от адаптера. На вкладке Battery в трее — заряд и время до полного / разряда.
 - **Режим "поверх всех окон"** — кнопка 📌 открепляет панель в плавающее окошко,
   которое висит над всеми окнами и во всех Spaces. Закрыть — Esc или 📌.
 - **Вкладка Battery** — здоровье и использование батареи в духе coconutBattery:
@@ -139,7 +142,7 @@ swift -e 'import Foundation; DistributedNotificationCenter.default().postNotific
 
 ### Скачать
 
-**[SystemControl-1.2.3.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
+**[SystemControl-1.2.4.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
 открыть образ и перетащить `System Control` в `Applications`.
 
 Приложение подписано ad-hoc (не нотаризовано), поэтому при первом запуске:

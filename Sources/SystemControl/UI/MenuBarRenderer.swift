@@ -70,12 +70,14 @@ enum MenuBarRenderer {
         let gap: CGFloat = n == 2 ? 2 : 0
         let bandH = (H - gap * CGFloat(n - 1)) / CGFloat(n)
 
+        // В одиночном режиме полоса во всю высоту → буква крупная; убавляем
+        let labelScale: CGFloat = n == 1 ? 0.53 : 0.66
         let image = NSImage(size: NSSize(width: W, height: H), flipped: false) { _ in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
             for (idx, s) in series.enumerated() {
                 let bandTop = H - CGFloat(idx) * (bandH + gap)   // строка 0 — верхняя
                 let rect = CGRect(x: 0, y: bandTop - bandH, width: W, height: bandH)
-                drawBars(ctx, values: s.values, label: s.label, rect: rect)
+                drawBars(ctx, values: s.values, label: s.label, rect: rect, labelScale: labelScale)
             }
             return true
         }
@@ -91,7 +93,7 @@ enum MenuBarRenderer {
     ] as CFArray
     private static let loadLocations: [CGFloat] = [0.0, 0.6, 1.0]
 
-    private static func drawBars(_ ctx: CGContext, values: [Double], label: String, rect: CGRect) {
+    private static func drawBars(_ ctx: CGContext, values: [Double], label: String, rect: CGRect, labelScale: CGFloat) {
         // Столбики
         let bars = resample(values, count: max(8, Int(rect.width / 3)))
         if !bars.isEmpty {
@@ -116,7 +118,7 @@ enum MenuBarRenderer {
 
         // Подпись CPU/GPU — ПОВЕРХ столбиков, чтобы всегда была видна;
         // тонкий шрифт + мягкая тень для контраста над яркими столбиками
-        let fontSize = rect.height * 0.66   // на ~20% меньше прежнего
+        let fontSize = rect.height * labelScale
         var font = NSFont.systemFont(ofSize: fontSize, weight: .thin)
         if let d = font.fontDescriptor.withDesign(.rounded) { font = NSFont(descriptor: d, size: fontSize) ?? font }
         let shadow = NSShadow()

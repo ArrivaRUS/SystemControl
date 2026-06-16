@@ -48,25 +48,24 @@ enum MenuBarRenderer {
         return layout(lines, centered: false, template: true)
     }
 
-    // MARK: - Energy: спарклайны истории загрузки CPU/GPU (цвета как на гейдже)
+    // MARK: - Energy: столбики истории загрузки (низ зелёный → верх красный),
+    // фоном тонкая полупрозрачная подпись CPU/GPU
 
-    private static let cpuColor = NSColor(srgbRed: 0.36, green: 0.66, blue: 1.0, alpha: 1)
-    private static let gpuColor = NSColor(srgbRed: 0.69, green: 0.51, blue: 1.0, alpha: 1)
-    private static let sparkWidth: CGFloat = 52
+    private static let chartWidth: CGFloat = 42   // на ~20% уже прежних 52
 
     static func loadImage(mode: MenuBarEnergyMode, cpuHistory: [Double], gpuHistory: [Double]) -> NSImage {
         switch mode {
-        case .cpu:    return sparkline([(cpuHistory, cpuColor)])
-        case .gpu:    return sparkline([(gpuHistory, gpuColor)])
-        case .cpuGpu: return sparkline([(cpuHistory, cpuColor), (gpuHistory, gpuColor)])
-        case .temperature: return sparkline([(cpuHistory, cpuColor)]) // сюда не попадает
+        case .cpu:    return barChart([(cpuHistory, "CPU")])
+        case .gpu:    return barChart([(gpuHistory, "GPU")])
+        case .cpuGpu: return barChart([(cpuHistory, "CPU"), (gpuHistory, "GPU")])
+        case .temperature: return barChart([(cpuHistory, "CPU")]) // сюда не попадает
         }
     }
 
-    // Один или два мини-графика 0..100%, сложенных по вертикали
-    private static func sparkline(_ series: [(values: [Double], color: NSColor)]) -> NSImage {
+    // Один или два столбиковых графика 0..100%, сложенных по вертикали
+    private static func barChart(_ series: [(values: [Double], label: String)]) -> NSImage {
         let H = barHeight
-        let W = sparkWidth
+        let W = chartWidth
         let n = max(1, series.count)
         let gap: CGFloat = n == 2 ? 2 : 0
         let bandH = (H - gap * CGFloat(n - 1)) / CGFloat(n)
@@ -74,12 +73,9 @@ enum MenuBarRenderer {
         let image = NSImage(size: NSSize(width: W, height: H), flipped: false) { _ in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
             for (idx, s) in series.enumerated() {
-                // строка 0 — верхняя
-                let bandTop = H - CGFloat(idx) * (bandH + gap)
-                let bandBottom = bandTop - bandH
-                drawSpark(ctx, values: s.values, color: s.color,
-                          rect: CGRect(x: 0.5, y: bandBottom + 1.5,
-                                       width: W - 1, height: bandH - 2.5))
+                let bandTop = H - CGFloat(idx) * (bandH + gap)   // строка 0 — верхняя
+                let rect = CGRect(x: 0, y: bandTop - bandH, width: W, height: bandH)
+                drawBars(ctx, values: s.values, label: s.label, rect: rect)
             }
             return true
         }
@@ -87,49 +83,62 @@ enum MenuBarRenderer {
         return image
     }
 
-    private static func drawSpark(_ ctx: CGContext, values: [Double], color: NSColor, rect: CGRect) {
-        func y(_ v: Double) -> CGFloat {
-            rect.minY + rect.height * CGFloat(max(0, min(100, v)) / 100)
-        }
-        // Базовая линия даже без данных
-        guard values.count > 1 else {
-            ctx.setStrokeColor(color.withAlphaComponent(0.6).cgColor)
-            ctx.setLineWidth(1)
-            ctx.move(to: CGPoint(x: rect.minX, y: rect.minY))
-            ctx.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-            ctx.strokePath()
-            return
-        }
-        let nn = values.count
-        func x(_ i: Int) -> CGFloat { rect.minX + rect.width * CGFloat(i) / CGFloat(nn - 1) }
+    // Градиент уровня: низ зелёный → жёлтый → красный наверху (100%)
+    private static let loadStops: CFArray = [
+        NSColor.systemGreen.cgColor,
+        NSColor.systemYellow.cgColor,
+        NSColor.systemRed.cgColor,
+    ] as CFArray
+    private static let loadLocations: [CGFloat] = [0.0, 0.6, 1.0]
 
-        let linePath = CGMutablePath()
-        linePath.move(to: CGPoint(x: x(0), y: y(values[0])))
-        for i in 1..<nn { linePath.addLine(to: CGPoint(x: x(i), y: y(values[i]))) }
+    private static func drawBars(_ ctx: CGContext, values: [Double], label: String, rect: CGRect) {
+        // Фоновая подпись CPU/GPU — тонкий полупрозрачный шрифт
+        let fontSize = rect.height * 0.82
+        var font = NSFont.systemFont(ofSize: fontSize, weight: .thin)
+        if let d = font.fontDescriptor.withDesign(.rounded) { font = NSFont(descriptor: d, size: fontSize) ?? font }
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font, .foregroundColor: NSColor.labelColor.withAlphaComponent(0.28),
+        ]
+        let str = NSAttributedString(string: label, attributes: attrs)
+        let ts = str.size()
+        str.draw(at: NSPoint(x: rect.minX + (rect.width - ts.width) / 2,
+                             y: rect.minY + (rect.height - ts.height) / 2))
 
-        // Заливка под линией — градиент
-        let fillPath = linePath.mutableCopy()!
-        fillPath.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        fillPath.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
-        fillPath.closeSubpath()
-        ctx.saveGState()
-        ctx.addPath(fillPath)
-        ctx.clip()
+        // Столбики поверх подписи
+        let bars = resample(values, count: max(8, Int(rect.width / 3)))
+        guard !bars.isEmpty else { return }
         let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                              colors: [color.withAlphaComponent(0.55).cgColor,
-                                       color.withAlphaComponent(0.06).cgColor] as CFArray,
-                              locations: [0, 1])!
-        ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: rect.maxY),
-                               end: CGPoint(x: 0, y: rect.minY), options: [])
-        ctx.restoreGState()
+                              colors: loadStops, locations: loadLocations)!
+        let slot = rect.width / CGFloat(bars.count)
+        let barW = max(1, slot - 1)
+        for (i, v) in bars.enumerated() {
+            let h = rect.height * CGFloat(max(0, min(100, v)) / 100)
+            guard h > 0.5 else { continue }
+            let bx = rect.minX + CGFloat(i) * slot + (slot - barW) / 2
+            let barRect = CGRect(x: bx, y: rect.minY, width: barW, height: h)
+            ctx.saveGState()
+            ctx.clip(to: barRect)
+            // градиент задан на всю высоту полосы → цвет зависит от абсолютной высоты
+            ctx.drawLinearGradient(grad,
+                                   start: CGPoint(x: 0, y: rect.minY),
+                                   end: CGPoint(x: 0, y: rect.maxY),
+                                   options: [])
+            ctx.restoreGState()
+        }
+    }
 
-        // Сама линия
-        ctx.addPath(linePath)
-        ctx.setStrokeColor(color.cgColor)
-        ctx.setLineWidth(1.2)
-        ctx.setLineJoin(.round)
-        ctx.setLineCap(.round)
-        ctx.strokePath()
+    // Усреднение истории в нужное число столбиков
+    private static func resample(_ v: [Double], count n: Int) -> [Double] {
+        guard v.count > n else { return v }
+        var out: [Double] = []
+        out.reserveCapacity(n)
+        for b in 0..<n {
+            let lo = b * v.count / n
+            let hi = max(lo + 1, (b + 1) * v.count / n)
+            let slice = v[lo..<min(hi, v.count)]
+            out.append(slice.reduce(0, +) / Double(slice.count))
+        }
+        return out
     }
 
     // MARK: - Battery: процент сверху, время снизу

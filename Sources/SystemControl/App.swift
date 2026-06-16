@@ -62,18 +62,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-// Лейбл в menu bar:
-//   одно значение  →  🔥62°  (одна строка, крупный шрифт)
-//   два значения   →  🔥62°  (две строки, мелкий шрифт: градусы сверху,
-//                      ⚡96W    ваты снизу)
-// Рисуется как NSImage точно по высоте строки меню (см. MenuBarRenderer):
-// многострочный SwiftUI-текст MenuBarExtra не умещает в толщину бара и
-// обрезает; NSImage нужной высоты раскладывается без обрезки и пустот.
+// Лейбл в menu bar. Рисуется как NSImage точно по высоте строки меню
+// (см. MenuBarRenderer): многострочный SwiftUI-текст MenuBarExtra не умещает
+// в толщину бара и обрезает; NSImage нужной высоты раскладывается ровно.
+//  • вкладка Battery → заряд + время (цветной)
+//  • вкладка Energy → по выбору: температура / CPU% / GPU% / CPU+GPU
 struct MenuBarLabel: View {
     @EnvironmentObject var state: AppState
 
     private var tempText: String? {
-        guard state.menuBarShowsTemp, let t = state.cpuTemp else { return nil }
+        guard let t = state.cpuTemp else { return nil }
         return "\(Int(t.rounded()))°"
     }
     private var wattsText: String? {
@@ -83,13 +81,21 @@ struct MenuBarLabel: View {
     }
 
     var body: some View {
-        // Battery-режим цветной → .original; Energy-режим монохромный → .template
         if state.tab == .battery, let b = state.menuBattery {
             Image(nsImage: MenuBarRenderer.batteryImage(b))
                 .renderingMode(.original)
-        } else {
+        } else if state.menuBarEnergyMode == .temperature {
+            // Температура — монохромный template (адаптируется к теме бара)
             Image(nsImage: MenuBarRenderer.image(temp: tempText, watts: wattsText))
                 .renderingMode(.template)
+        } else {
+            // Загрузка CPU/GPU — цветной (голубой/фиолетовый)
+            Image(nsImage: MenuBarRenderer.loadImage(
+                mode: state.menuBarEnergyMode,
+                cpu: state.cpuLoad,
+                gpu: state.gpuLoad,
+                watts: wattsText))
+                .renderingMode(.original)
         }
     }
 }

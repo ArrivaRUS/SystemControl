@@ -23,6 +23,15 @@ struct SettingsView: View {
         )
     }
 
+    private var energyModeBinding: Binding<Int> {
+        Binding(
+            get: {
+                AppState.energyModeChoices.firstIndex { $0.mode == state.menuBarEnergyMode } ?? 0
+            },
+            set: { state.menuBarEnergyMode = AppState.energyModeChoices[$0].mode }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Шапка настроек
@@ -57,11 +66,16 @@ struct SettingsView: View {
                             hint(loginError, color: Theme.red)
                         }
                         divider
-                        toggleRow(
-                            icon: "thermometer.medium",
-                            title: "Temperature in menu bar",
-                            isOn: $state.menuBarShowsTemp
-                        )
+                        HStack {
+                            rowLabel(icon: "menubar.rectangle", title: "Menu bar (Energy)")
+                            Spacer()
+                            PillPicker(
+                                options: AppState.energyModeChoices.map(\.label),
+                                selection: energyModeBinding,
+                                fontSize: 9.5
+                            )
+                        }
+                        .padding(.vertical, 2)
                         divider
                         toggleRow(
                             icon: "bolt.fill",

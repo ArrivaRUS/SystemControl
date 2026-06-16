@@ -44,8 +44,9 @@ final class AppState: ObservableObject {
     @Published var updateInterval: Double {
         didSet { defaults.set(updateInterval, forKey: "updateInterval"); restartTimer() }
     }
-    @Published var menuBarShowsTemp: Bool {
-        didSet { defaults.set(menuBarShowsTemp, forKey: "menuBarShowsTemp") }
+    // Что показывать в трее на вкладке Energy
+    @Published var menuBarEnergyMode: MenuBarEnergyMode {
+        didSet { defaults.set(menuBarEnergyMode.rawValue, forKey: "menuBarEnergyMode") }
     }
     @Published var menuBarShowsPower: Bool {
         didSet { defaults.set(menuBarShowsPower, forKey: "menuBarShowsPower") }
@@ -53,6 +54,9 @@ final class AppState: ObservableObject {
 
     static let windowChoices: [(label: String, seconds: Double)] = [
         ("10s", 10), ("30s", 30), ("1m", 60),
+    ]
+    static let energyModeChoices: [(label: String, mode: MenuBarEnergyMode)] = [
+        ("Temp", .temperature), ("CPU", .cpu), ("GPU", .gpu), ("Both", .cpuGpu),
     ]
     static let intervalChoices: [(label: String, seconds: Double)] = [
         ("1s", 1), ("2s", 2), ("5s", 5), ("10s", 10),
@@ -136,7 +140,8 @@ final class AppState: ObservableObject {
         }
         let i = defaults.double(forKey: "updateInterval")
         updateInterval = i > 0 ? i : 2
-        menuBarShowsTemp = defaults.object(forKey: "menuBarShowsTemp") as? Bool ?? true
+        menuBarEnergyMode = (defaults.string(forKey: "menuBarEnergyMode"))
+            .flatMap(MenuBarEnergyMode.init) ?? .temperature
         menuBarShowsPower = defaults.object(forKey: "menuBarShowsPower") as? Bool ?? true
         tab = defaults.string(forKey: "selectedTab") == "battery" ? .battery : .energy
         restartTimer()
@@ -202,8 +207,11 @@ final class AppState: ObservableObject {
         Self.push(&bufCpuLoadHistory, load == nil ? nil : smCpuLoad)
         Self.push(&bufGpuLoadHistory, gpuLoadValue == nil ? nil : smGpuLoad)
 
-        // Температура CPU нужна и при скрытой панели — она в menu bar
+        // Температура и загрузка CPU/GPU нужны и при скрытой панели —
+        // их показывает иконка в трее (режимы Energy: Temp/CPU/GPU/Both)
         if let v = smCpuTemp, cpuTemp != v { cpuTemp = v }
+        if let v = smCpuLoad, cpuLoad != v { cpuLoad = v }
+        if let v = smGpuLoad, gpuLoad != v { gpuLoad = v }
 
         guard uiVisible else { return }
 
@@ -221,9 +229,8 @@ final class AppState: ObservableObject {
         }
         if self.sensors != sensorsQ { self.sensors = sensorsQ }
 
+        // cpuLoad/gpuLoad уже опубликованы выше (нужны трею); тут только gpuTemp
         if let v = smGpuTemp, gpuTemp != v { gpuTemp = v }
-        if let v = smCpuLoad, cpuLoad != v { cpuLoad = v }
-        if let v = smGpuLoad, gpuLoad != v { gpuLoad = v }
         if battery != smBattery { battery = smBattery }
 
         cpuTempHistory = bufCpuTempHistory

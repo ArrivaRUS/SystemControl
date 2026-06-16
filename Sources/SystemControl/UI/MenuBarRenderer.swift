@@ -1,5 +1,10 @@
 import AppKit
 
+// Что показывать в трее на вкладке Energy
+enum MenuBarEnergyMode: String {
+    case temperature, cpu, gpu, cpuGpu
+}
+
 // Рендер лейбла menu bar в NSImage точно по высоте строки меню.
 // SwiftUI-текст (тем более многострочный) в MenuBarExtra не масштабируется
 // под толщину бара и обрезается; NSImage нужной высоты решает это — мы сами
@@ -41,6 +46,41 @@ enum MenuBarRenderer {
             lines = [line([.symbol("flame.fill", [])], size: H * 0.64)]
         }
         return layout(lines, centered: false, template: true)
+    }
+
+    // MARK: - Energy: загрузка CPU/GPU в процентах (цвета как на гейдже)
+
+    private static let cpuColor = NSColor(srgbRed: 0.36, green: 0.66, blue: 1.0, alpha: 1)
+    private static let gpuColor = NSColor(srgbRed: 0.69, green: 0.51, blue: 1.0, alpha: 1)
+
+    private struct LoadEntry { let symbol: String?; let text: String; let color: NSColor }
+
+    static func loadImage(mode: MenuBarEnergyMode, cpu: Double, gpu: Double?, watts: String?) -> NSImage {
+        let H = barHeight
+        func pct(_ v: Double) -> String { "\(Int(v.rounded()))%" }
+        let gpuStr = gpu.map(pct) ?? "—"
+
+        var entries: [LoadEntry]
+        switch mode {
+        case .cpu:    entries = [LoadEntry(symbol: nil, text: "CPU \(pct(cpu))", color: cpuColor)]
+        case .gpu:    entries = [LoadEntry(symbol: nil, text: "GPU \(gpuStr)", color: gpuColor)]
+        case .cpuGpu: entries = [LoadEntry(symbol: nil, text: "CPU \(pct(cpu))", color: cpuColor),
+                                 LoadEntry(symbol: nil, text: "GPU \(gpuStr)", color: gpuColor)]
+        case .temperature: entries = []
+        }
+        // Ватты от адаптера — только в одно-строчных режимах (иначе 3 строки)
+        if let watts, entries.count == 1 {
+            entries.append(LoadEntry(symbol: "bolt.fill", text: watts, color: .labelColor))
+        }
+
+        let size = entries.count == 2 ? (H / 2) * 0.80 : H * 0.60
+        let lines = entries.map { e -> NSAttributedString in
+            var segs: [Seg] = []
+            if let s = e.symbol { segs.append(.symbol(s, [e.color])) }
+            segs.append(.text(e.text, e.color))
+            return line(segs, size: size)
+        }
+        return layout(lines, centered: false, template: false)
     }
 
     // MARK: - Battery: процент сверху, время снизу

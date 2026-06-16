@@ -92,39 +92,46 @@ enum MenuBarRenderer {
     private static let loadLocations: [CGFloat] = [0.0, 0.6, 1.0]
 
     private static func drawBars(_ ctx: CGContext, values: [Double], label: String, rect: CGRect) {
-        // Фоновая подпись CPU/GPU — тонкий полупрозрачный шрифт
-        let fontSize = rect.height * 0.82
+        // Столбики
+        let bars = resample(values, count: max(8, Int(rect.width / 3)))
+        if !bars.isEmpty {
+            let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                  colors: loadStops, locations: loadLocations)!
+            let slot = rect.width / CGFloat(bars.count)
+            let barW = max(1, slot - 1)
+            for (i, v) in bars.enumerated() {
+                let h = rect.height * CGFloat(max(0, min(100, v)) / 100)
+                guard h > 0.5 else { continue }
+                let bx = rect.minX + CGFloat(i) * slot + (slot - barW) / 2
+                ctx.saveGState()
+                ctx.clip(to: CGRect(x: bx, y: rect.minY, width: barW, height: h))
+                // градиент на всю высоту полосы → цвет зависит от абсолютной высоты
+                ctx.drawLinearGradient(grad,
+                                       start: CGPoint(x: 0, y: rect.minY),
+                                       end: CGPoint(x: 0, y: rect.maxY),
+                                       options: [])
+                ctx.restoreGState()
+            }
+        }
+
+        // Подпись CPU/GPU — ПОВЕРХ столбиков, чтобы всегда была видна;
+        // тонкий шрифт + мягкая тень для контраста над яркими столбиками
+        let fontSize = rect.height * 0.66   // на ~20% меньше прежнего
         var font = NSFont.systemFont(ofSize: fontSize, weight: .thin)
         if let d = font.fontDescriptor.withDesign(.rounded) { font = NSFont(descriptor: d, size: fontSize) ?? font }
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.55)
+        shadow.shadowBlurRadius = 1.4
+        shadow.shadowOffset = .zero
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: font, .foregroundColor: NSColor.labelColor.withAlphaComponent(0.28),
+            .font: font,
+            .foregroundColor: NSColor.white.withAlphaComponent(0.85),
+            .shadow: shadow,
         ]
         let str = NSAttributedString(string: label, attributes: attrs)
         let ts = str.size()
         str.draw(at: NSPoint(x: rect.minX + (rect.width - ts.width) / 2,
                              y: rect.minY + (rect.height - ts.height) / 2))
-
-        // Столбики поверх подписи
-        let bars = resample(values, count: max(8, Int(rect.width / 3)))
-        guard !bars.isEmpty else { return }
-        let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                              colors: loadStops, locations: loadLocations)!
-        let slot = rect.width / CGFloat(bars.count)
-        let barW = max(1, slot - 1)
-        for (i, v) in bars.enumerated() {
-            let h = rect.height * CGFloat(max(0, min(100, v)) / 100)
-            guard h > 0.5 else { continue }
-            let bx = rect.minX + CGFloat(i) * slot + (slot - barW) / 2
-            let barRect = CGRect(x: bx, y: rect.minY, width: barW, height: h)
-            ctx.saveGState()
-            ctx.clip(to: barRect)
-            // градиент задан на всю высоту полосы → цвет зависит от абсолютной высоты
-            ctx.drawLinearGradient(grad,
-                                   start: CGPoint(x: 0, y: rect.minY),
-                                   end: CGPoint(x: 0, y: rect.maxY),
-                                   options: [])
-            ctx.restoreGState()
-        }
     }
 
     // Усреднение истории в нужное число столбиков

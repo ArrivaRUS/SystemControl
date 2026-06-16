@@ -19,6 +19,10 @@ final class AppState: ObservableObject {
     @Published var cpuLoadHistory: [Double] = []
     @Published var gpuLoad: Double?
     @Published var gpuLoadHistory: [Double] = []
+    // История загрузки для иконки в трее — публикуется ВСЕГДА (даже при
+    // закрытой панели), отдельно от панельных, чтобы не дёргать офскрин-панель
+    @Published var menuCpuLoadHistory: [Double] = []
+    @Published var menuGpuLoadHistory: [Double] = []
     @Published var sensors: [ThermalSensor] = []
     @Published var battery: BatteryInfo?
     @Published var menuBattery: MenuBatterySummary?
@@ -46,7 +50,14 @@ final class AppState: ObservableObject {
     }
     // Что показывать в трее на вкладке Energy
     @Published var menuBarEnergyMode: MenuBarEnergyMode {
-        didSet { defaults.set(menuBarEnergyMode.rawValue, forKey: "menuBarEnergyMode") }
+        didSet {
+            defaults.set(menuBarEnergyMode.rawValue, forKey: "menuBarEnergyMode")
+            // мгновенно отдать накопленную историю при переключении на график
+            if menuBarEnergyMode != .temperature {
+                menuCpuLoadHistory = bufCpuLoadHistory
+                menuGpuLoadHistory = bufGpuLoadHistory
+            }
+        }
     }
     @Published var menuBarShowsPower: Bool {
         didSet { defaults.set(menuBarShowsPower, forKey: "menuBarShowsPower") }
@@ -74,7 +85,8 @@ final class AppState: ObservableObject {
     private var timer: DispatchSourceTimer?
     private var killMessageTask: Task<Void, Never>?
 
-    private nonisolated static let historyPoints = 90
+    // ~5 минут при дефолтном интервале 2с (150 точек) — для спарклайнов в трее
+    private nonisolated static let historyPoints = 150
     private nonisolated static let listLimit = 9
 
     // MARK: - Видимость UI
@@ -207,11 +219,15 @@ final class AppState: ObservableObject {
         Self.push(&bufCpuLoadHistory, load == nil ? nil : smCpuLoad)
         Self.push(&bufGpuLoadHistory, gpuLoadValue == nil ? nil : smGpuLoad)
 
-        // Температура и загрузка CPU/GPU нужны и при скрытой панели —
+        // Температура, загрузка и её история нужны и при скрытой панели —
         // их показывает иконка в трее (режимы Energy: Temp/CPU/GPU/Both)
         if let v = smCpuTemp, cpuTemp != v { cpuTemp = v }
         if let v = smCpuLoad, cpuLoad != v { cpuLoad = v }
         if let v = smGpuLoad, gpuLoad != v { gpuLoad = v }
+        if menuBarEnergyMode != .temperature {
+            menuCpuLoadHistory = bufCpuLoadHistory
+            menuGpuLoadHistory = bufGpuLoadHistory
+        }
 
         guard uiVisible else { return }
 

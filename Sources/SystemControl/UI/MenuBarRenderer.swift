@@ -48,39 +48,88 @@ enum MenuBarRenderer {
         return layout(lines, centered: false, template: true)
     }
 
-    // MARK: - Energy: загрузка CPU/GPU в процентах (цвета как на гейдже)
+    // MARK: - Energy: спарклайны истории загрузки CPU/GPU (цвета как на гейдже)
 
     private static let cpuColor = NSColor(srgbRed: 0.36, green: 0.66, blue: 1.0, alpha: 1)
     private static let gpuColor = NSColor(srgbRed: 0.69, green: 0.51, blue: 1.0, alpha: 1)
+    private static let sparkWidth: CGFloat = 52
 
-    private struct LoadEntry { let symbol: String?; let text: String; let color: NSColor }
-
-    static func loadImage(mode: MenuBarEnergyMode, cpu: Double, gpu: Double?, watts: String?) -> NSImage {
-        let H = barHeight
-        func pct(_ v: Double) -> String { "\(Int(v.rounded()))%" }
-        let gpuStr = gpu.map(pct) ?? "—"
-
-        var entries: [LoadEntry]
+    static func loadImage(mode: MenuBarEnergyMode, cpuHistory: [Double], gpuHistory: [Double]) -> NSImage {
         switch mode {
-        case .cpu:    entries = [LoadEntry(symbol: nil, text: "CPU \(pct(cpu))", color: cpuColor)]
-        case .gpu:    entries = [LoadEntry(symbol: nil, text: "GPU \(gpuStr)", color: gpuColor)]
-        case .cpuGpu: entries = [LoadEntry(symbol: nil, text: "CPU \(pct(cpu))", color: cpuColor),
-                                 LoadEntry(symbol: nil, text: "GPU \(gpuStr)", color: gpuColor)]
-        case .temperature: entries = []
+        case .cpu:    return sparkline([(cpuHistory, cpuColor)])
+        case .gpu:    return sparkline([(gpuHistory, gpuColor)])
+        case .cpuGpu: return sparkline([(cpuHistory, cpuColor), (gpuHistory, gpuColor)])
+        case .temperature: return sparkline([(cpuHistory, cpuColor)]) // сюда не попадает
         }
-        // Ватты от адаптера — только в одно-строчных режимах (иначе 3 строки)
-        if let watts, entries.count == 1 {
-            entries.append(LoadEntry(symbol: "bolt.fill", text: watts, color: .labelColor))
-        }
+    }
 
-        let size = entries.count == 2 ? (H / 2) * 0.80 : H * 0.60
-        let lines = entries.map { e -> NSAttributedString in
-            var segs: [Seg] = []
-            if let s = e.symbol { segs.append(.symbol(s, [e.color])) }
-            segs.append(.text(e.text, e.color))
-            return line(segs, size: size)
+    // Один или два мини-графика 0..100%, сложенных по вертикали
+    private static func sparkline(_ series: [(values: [Double], color: NSColor)]) -> NSImage {
+        let H = barHeight
+        let W = sparkWidth
+        let n = max(1, series.count)
+        let gap: CGFloat = n == 2 ? 2 : 0
+        let bandH = (H - gap * CGFloat(n - 1)) / CGFloat(n)
+
+        let image = NSImage(size: NSSize(width: W, height: H), flipped: false) { _ in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            for (idx, s) in series.enumerated() {
+                // строка 0 — верхняя
+                let bandTop = H - CGFloat(idx) * (bandH + gap)
+                let bandBottom = bandTop - bandH
+                drawSpark(ctx, values: s.values, color: s.color,
+                          rect: CGRect(x: 0.5, y: bandBottom + 1.5,
+                                       width: W - 1, height: bandH - 2.5))
+            }
+            return true
         }
-        return layout(lines, centered: false, template: false)
+        image.isTemplate = false // цветной → MenuBarLabel рендерит .original
+        return image
+    }
+
+    private static func drawSpark(_ ctx: CGContext, values: [Double], color: NSColor, rect: CGRect) {
+        func y(_ v: Double) -> CGFloat {
+            rect.minY + rect.height * CGFloat(max(0, min(100, v)) / 100)
+        }
+        // Базовая линия даже без данных
+        guard values.count > 1 else {
+            ctx.setStrokeColor(color.withAlphaComponent(0.6).cgColor)
+            ctx.setLineWidth(1)
+            ctx.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            ctx.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+            ctx.strokePath()
+            return
+        }
+        let nn = values.count
+        func x(_ i: Int) -> CGFloat { rect.minX + rect.width * CGFloat(i) / CGFloat(nn - 1) }
+
+        let linePath = CGMutablePath()
+        linePath.move(to: CGPoint(x: x(0), y: y(values[0])))
+        for i in 1..<nn { linePath.addLine(to: CGPoint(x: x(i), y: y(values[i]))) }
+
+        // Заливка под линией — градиент
+        let fillPath = linePath.mutableCopy()!
+        fillPath.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        fillPath.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        fillPath.closeSubpath()
+        ctx.saveGState()
+        ctx.addPath(fillPath)
+        ctx.clip()
+        let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                              colors: [color.withAlphaComponent(0.55).cgColor,
+                                       color.withAlphaComponent(0.06).cgColor] as CFArray,
+                              locations: [0, 1])!
+        ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: rect.maxY),
+                               end: CGPoint(x: 0, y: rect.minY), options: [])
+        ctx.restoreGState()
+
+        // Сама линия
+        ctx.addPath(linePath)
+        ctx.setStrokeColor(color.cgColor)
+        ctx.setLineWidth(1.2)
+        ctx.setLineJoin(.round)
+        ctx.setLineCap(.round)
+        ctx.strokePath()
     }
 
     // MARK: - Battery: процент сверху, время снизу

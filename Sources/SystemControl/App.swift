@@ -89,12 +89,11 @@ struct MenuBarLabel: View {
             Image(nsImage: MenuBarRenderer.image(temp: tempText, watts: wattsText))
                 .renderingMode(.template)
         } else {
-            // Загрузка CPU/GPU — цветной (голубой/фиолетовый)
+            // Загрузка CPU/GPU — мини-графики истории (голубой/фиолетовый)
             Image(nsImage: MenuBarRenderer.loadImage(
                 mode: state.menuBarEnergyMode,
-                cpu: state.cpuLoad,
-                gpu: state.gpuLoad,
-                watts: wattsText))
+                cpuHistory: state.menuCpuLoadHistory,
+                gpuHistory: state.menuGpuLoadHistory))
                 .renderingMode(.original)
         }
     }

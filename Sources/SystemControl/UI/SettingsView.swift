@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var launchAtLogin = false
     @State private var loginError: String?
     @State private var sensorsExpanded = false
+    @StateObject private var updater = UpdateChecker()
 
     private var isBundled: Bool { Bundle.main.bundleIdentifier != nil }
 
@@ -142,12 +143,14 @@ struct SettingsView: View {
                         }
                     }
 
-                    VStack(spacing: 2) {
-                        HStack(spacing: 0) {
-                            Text("System Control 1.2.4 · by Alex Kovalev · ")
-                            GitHubLink()
-                        }
-                        Text("Energy is CPU time averaged over the window")
+                    // Версия + проверка обновлений
+                    settingsCard {
+                        updateRow
+                    }
+
+                    HStack(spacing: 0) {
+                        Text("System Control \(updater.currentVersion) · by Alex Kovalev · ")
+                        GitHubLink()
                     }
                     .font(.system(size: 8.5))
                     .foregroundStyle(.secondary.opacity(0.6))
@@ -162,6 +165,50 @@ struct SettingsView: View {
         .background(Theme.panelBackground)
         .onAppear { refreshLoginStatus() }
         .onDisappear { state.setSensorListVisible(false) }
+    }
+
+    // MARK: - Обновления
+
+    @ViewBuilder
+    private var updateRow: some View {
+        HStack(spacing: 8) {
+            rowLabel(icon: "arrow.down.circle", title: "Version \(updater.currentVersion)")
+            Spacer()
+            switch updater.status {
+            case .checking:
+                Text("Checking…")
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+            case .available(let v, let url):
+                updateButton("Update to \(v)", fill: Theme.ember) { updater.download(url) }
+            case .upToDate:
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Theme.mint)
+                    Text("Up to date")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            default:
+                updateButton(updater.status == .failed ? "Retry" : "Check for Updates",
+                             fill: Color.white.opacity(0.12), textColor: .primary) { updater.check() }
+            }
+        }
+        .animation(.easeOut(duration: 0.18), value: updater.status)
+    }
+
+    private func updateButton(_ label: String, fill: Color, textColor: Color = .white,
+                              action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(textColor)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 5)
+                .background(Capsule().fill(fill))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Строительные блоки

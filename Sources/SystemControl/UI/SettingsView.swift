@@ -179,8 +179,12 @@ struct SettingsView: View {
                 Text("Checking…")
                     .font(.system(size: 10.5, weight: .medium))
                     .foregroundStyle(.secondary)
+            case .downloading:
+                Text("Downloading…")
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.secondary)
             case .available(let v, let url):
-                updateButton("Update to \(v)", fill: Theme.ember) { updater.download(url) }
+                updateButton("Update to \(v)", fill: Theme.ember) { updater.installUpdate(url) }
             case .upToDate:
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark.circle.fill")

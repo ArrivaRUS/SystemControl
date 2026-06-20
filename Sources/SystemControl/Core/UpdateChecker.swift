@@ -11,8 +11,11 @@ final class UpdateChecker: ObservableObject {
         case checking
         case upToDate
         case available(version: String, url: URL)
+        case downloading
         case failed
     }
+
+    private enum UpdateError: Error { case http, process(String), noApp }
 
     @Published var status: Status = .idle
 
@@ -58,6 +61,113 @@ final class UpdateChecker: ObservableObject {
     // Открывает загрузку DMG (или страницу релиза) в браузере по умолчанию
     func download(_ url: URL) {
         NSWorkspace.shared.open(url)
+    }
+
+    // MARK: - Self-update «в один клик»
+    // Приложение само качает DMG (без флага карантина → Gatekeeper молчит),
+    // извлекает новый бандл, и отсоединённый скрипт после выхода приложения
+    // подменяет бандл и перезапускает его.
+    func installUpdate(_ dmgURL: URL) {
+        if case .downloading = status { return }
+        status = .downloading
+        let installedBundle = Bundle.main.bundlePath
+        let pid = ProcessInfo.processInfo.processIdentifier
+        Task {
+            do {
+                // 1) Скачать DMG (URLSession не ставит com.apple.quarantine)
+                var req = URLRequest(url: dmgURL)
+                req.setValue("SystemControl", forHTTPHeaderField: "User-Agent")
+                let (tmp, resp) = try await URLSession.shared.download(for: req)
+                guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw UpdateError.http }
+
+                let dmgPath = NSTemporaryDirectory() + "sc-update.dmg"
+                try? FileManager.default.removeItem(atPath: dmgPath)
+                try FileManager.default.moveItem(at: tmp, to: URL(fileURLWithPath: dmgPath))
+
+                // 2) Смонтировать, извлечь .app, отмонтировать (в фоне — блокирующие вызовы)
+                let staged = try await Task.detached(priority: .userInitiated) {
+                    try Self.stageNewApp(dmgPath: dmgPath)
+                }.value
+
+                // 3) Запустить отсоединённый помощник и выйти — он подменит и перезапустит
+                try Self.launchSwapHelper(stagedApp: staged, installedBundle: installedBundle,
+                                          pid: pid, dmgPath: dmgPath)
+                NSApp.terminate(nil)
+            } catch {
+                status = .failed
+            }
+        }
+    }
+
+    // Монтирует DMG, копирует .app в staging, отмонтирует. Возвращает путь к копии.
+    private nonisolated static func stageNewApp(dmgPath: String) throws -> String {
+        let fm = FileManager.default
+        let mount = NSTemporaryDirectory() + "sc-update-mnt"
+        try? fm.removeItem(atPath: mount)
+        try fm.createDirectory(atPath: mount, withIntermediateDirectories: true)
+
+        try run("/usr/bin/hdiutil", ["attach", dmgPath, "-nobrowse", "-readonly", "-mountpoint", mount])
+        defer { _ = try? run("/usr/bin/hdiutil", ["detach", mount, "-force"]) }
+
+        guard let appName = (try fm.contentsOfDirectory(atPath: mount)).first(where: { $0.hasSuffix(".app") }) else {
+            throw UpdateError.noApp
+        }
+        let srcApp = mount + "/" + appName
+        // Новый бандл реально извлёкся?
+        guard fm.fileExists(atPath: srcApp + "/Contents/Info.plist") else { throw UpdateError.noApp }
+
+        let stageDir = NSTemporaryDirectory() + "sc-update-stage"
+        try? fm.removeItem(atPath: stageDir)
+        try fm.createDirectory(atPath: stageDir, withIntermediateDirectories: true)
+        let staged = stageDir + "/" + appName
+        try run("/bin/cp", ["-R", srcApp, staged])
+        return staged
+    }
+
+    // Скрипт-помощник: ждёт выхода приложения, безопасно подменяет бандл, перезапускает
+    private nonisolated static func launchSwapHelper(stagedApp: String, installedBundle: String,
+                                                     pid: Int32, dmgPath: String) throws {
+        let stageDir = (stagedApp as NSString).deletingLastPathComponent
+        let script = """
+        #!/bin/sh
+        APP="\(installedBundle)"
+        SRC="\(stagedApp)"
+        # дождаться выхода приложения
+        for i in $(seq 1 100); do kill -0 \(pid) 2>/dev/null || break; sleep 0.1; done
+        sleep 0.3
+        # сперва скопировать рядом — если не выйдет, старый бандл цел
+        NEW="$APP.new"
+        rm -rf "$NEW"
+        if /bin/cp -R "$SRC" "$NEW"; then
+          rm -rf "$APP"
+          /bin/mv "$NEW" "$APP"
+          /usr/bin/xattr -dr com.apple.quarantine "$APP" 2>/dev/null
+        fi
+        rm -rf "\(stageDir)" "\(dmgPath)"
+        open "$APP"
+        """
+        let scriptPath = NSTemporaryDirectory() + "sc-update.sh"
+        try script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
+        // Полностью отсоединяем worker, чтобы пережил выход приложения
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", "nohup /bin/sh '\(scriptPath)' >/dev/null 2>&1 &"]
+        try p.run()
+    }
+
+    @discardableResult
+    private nonisolated static func run(_ launch: String, _ args: [String]) throws -> String {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: launch)
+        p.arguments = args
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        p.standardError = pipe
+        try p.run()
+        p.waitUntilExit()
+        let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        guard p.terminationStatus == 0 else { throw UpdateError.process(out) }
+        return out
     }
 
     // Семантическое сравнение "1.2.10" > "1.2.9"

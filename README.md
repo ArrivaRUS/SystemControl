@@ -52,7 +52,7 @@ A native macOS menu bar utility that shows **what is burning energy and heating 
 
 ### Download
 
-**[SystemControl-1.2.5.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
+**[SystemControl-1.2.6.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
 open the image and drag `System Control` to `Applications`.
 
 The app is ad-hoc signed (not notarized), so on first launch:
@@ -146,7 +146,7 @@ swift -e 'import Foundation; DistributedNotificationCenter.default().postNotific
 
 ### Скачать
 
-**[SystemControl-1.2.5.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
+**[SystemControl-1.2.6.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
 открыть образ и перетащить `System Control` в `Applications`.
 
 Приложение подписано ad-hoc (не нотаризовано), поэтому при первом запуске:

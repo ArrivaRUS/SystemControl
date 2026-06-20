@@ -27,14 +27,20 @@ final class UpdateChecker: ObservableObject {
         status = .checking
         Task {
             do {
-                var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(Self.repo)/releases/latest")!)
+                // Список релизов, а не /releases/latest: последний эндпоинт
+                // у GitHub иногда отвечает 504, а /releases стабилен.
+                var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(Self.repo)/releases?per_page=10")!)
                 req.setValue("SystemControl", forHTTPHeaderField: "User-Agent") // GitHub требует UA
                 req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
                 req.cachePolicy = .reloadIgnoringLocalCacheData
                 let (data, resp) = try await URLSession.shared.data(for: req)
                 guard (resp as? HTTPURLResponse)?.statusCode == 200 else { status = .failed; return }
-                let rel = try JSONDecoder().decode(Release.self, from: data)
+                let releases = try JSONDecoder().decode([Release].self, from: data)
 
+                // Первый опубликованный (не черновик и не pre-release)
+                guard let rel = releases.first(where: { !$0.draft && !$0.prerelease }) else {
+                    status = .upToDate; return
+                }
                 let latest = rel.tag_name.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
                 let dmg = rel.assets.first { $0.name.lowercased().hasSuffix(".dmg") }
                 let target = dmg.flatMap { URL(string: $0.browser_download_url) }
@@ -69,6 +75,8 @@ final class UpdateChecker: ObservableObject {
     private struct Release: Decodable {
         let tag_name: String
         let html_url: String
+        let draft: Bool
+        let prerelease: Bool
         let assets: [Asset]
         struct Asset: Decodable { let name: String; let browser_download_url: String }
     }

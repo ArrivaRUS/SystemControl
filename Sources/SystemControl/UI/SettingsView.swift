@@ -213,14 +213,23 @@ struct SettingsView: View {
                     updater.installUpdate(url)
                 }
             case .upToDate:
-                HStack(spacing: 4) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Theme.mint)
-                    Text(tr("Up to date", "Последняя версия"))
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(.secondary)
+                // Кликабельно — можно перепроверить снова (не тупик)
+                Button { updater.check() } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.mint)
+                        Text(tr("Up to date", "Последняя версия"))
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary.opacity(0.7))
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .help(tr("Check again", "Проверить снова"))
             default:
                 updateButton(updater.status == .failed ? tr("Retry", "Повторить")
                                                        : tr("Check for Updates", "Проверить обновления"),

@@ -183,7 +183,11 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.panelBackground)
-        .onAppear { refreshLoginStatus() }
+        .onAppear {
+            refreshLoginStatus()
+            // Тихо проверить обновления при открытии настроек — апдейт всплывёт сам
+            if case .idle = updater.status { updater.check(silent: true) }
+        }
         .onDisappear { state.setSensorListVisible(false) }
     }
 

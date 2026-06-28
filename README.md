@@ -12,9 +12,9 @@
 
 **[English](#-english)** · **[Русский](#-русский)**
 
-| Energy | Battery |
-|---|---|
-| ![Main panel](assets/preview_main.png) | ![Battery](assets/preview_battery.png) |
+| Energy | Battery | Settings |
+|---|---|---|
+| ![Energy](assets/preview_main.png) | ![Battery](assets/preview_battery.png) | ![Settings](assets/preview_settings.png) |
 
 ---
 

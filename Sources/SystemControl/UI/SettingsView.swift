@@ -159,13 +159,11 @@ struct SettingsView: View {
                         }
                     }
 
-                    // Версия + проверка обновлений + release notes
+                    // Версия + проверка обновлений + release notes (всегда доступны)
                     settingsCard {
                         updateRow
-                        if updater.updateAvailable, !updater.notes.isEmpty {
-                            divider
-                            releaseNotesView
-                        }
+                        divider
+                        releaseNotesSection
                     }
 
                     HStack(spacing: 0) {
@@ -239,15 +237,20 @@ struct SettingsView: View {
         .animation(.easeOut(duration: 0.18), value: updater.status)
     }
 
-    // Накопленные release notes (за все пропущенные версии), сворачиваемые
+    // Release notes — доступны всегда. При наличии обновления показываем заметки
+    // новых версий; иначе по запросу подгружаем историю последних релизов.
     @ViewBuilder
-    private var releaseNotesView: some View {
+    private var releaseNotesSection: some View {
+        let items = updater.updateAvailable ? updater.notes : updater.history
         VStack(alignment: .leading, spacing: 6) {
             Button {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { notesExpanded.toggle() }
+                if notesExpanded, !updater.updateAvailable { updater.loadHistory() }
             } label: {
                 HStack {
-                    rowLabel(icon: "sparkles.rectangle.stack", title: tr("What's new", "Что нового"))
+                    rowLabel(icon: "sparkles.rectangle.stack",
+                             title: updater.updateAvailable ? tr("What's new", "Что нового")
+                                                            : tr("Release notes", "История версий"))
                     Spacer()
                     Image(systemName: "chevron.down")
                         .font(.system(size: 9, weight: .bold))
@@ -259,7 +262,11 @@ struct SettingsView: View {
             .buttonStyle(.plain)
 
             if notesExpanded {
-                ForEach(updater.notes) { note in
+                if items.isEmpty {
+                    hint(updater.historyLoading ? tr("Loading…", "Загрузка…")
+                                                : tr("No notes available", "Заметок нет"))
+                }
+                ForEach(items) { note in
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(note.version)" + (note.date.isEmpty ? "" : "  ·  \(note.date)"))
                             .font(.system(size: 10.5, weight: .bold, design: .rounded))

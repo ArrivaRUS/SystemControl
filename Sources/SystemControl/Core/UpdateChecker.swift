@@ -28,6 +28,8 @@ final class UpdateChecker: ObservableObject {
 
     @Published var status: Status = .idle
     @Published var notes: [ReleaseNote] = []   // версии новее текущей, сверху новейшая
+    @Published var history: [ReleaseNote] = [] // последние релизы (для просмотра в любой момент)
+    @Published var historyLoading = false
 
     private static let repo = "ArrivaRUS/SystemControl"
     private var timer: Timer?
@@ -92,6 +94,29 @@ final class UpdateChecker: ObservableObject {
             } catch {
                 if !silent { status = .failed }
             }
+        }
+    }
+
+    // Загрузка последних релизов для просмотра notes в любой момент (даже на свежей)
+    func loadHistory() {
+        if historyLoading || !history.isEmpty { return }
+        historyLoading = true
+        Task {
+            do {
+                var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(Self.repo)/releases?per_page=10")!)
+                req.setValue("SystemControl", forHTTPHeaderField: "User-Agent")
+                req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+                req.cachePolicy = .reloadIgnoringLocalCacheData
+                let (data, resp) = try await URLSession.shared.data(for: req)
+                guard (resp as? HTTPURLResponse)?.statusCode == 200 else { historyLoading = false; return }
+                let releases = try JSONDecoder().decode([Release].self, from: data)
+                history = releases.filter { !$0.draft && !$0.prerelease }.prefix(6).map {
+                    ReleaseNote(version: Self.ver($0.tag_name),
+                                date: String($0.published_at?.prefix(10) ?? ""),
+                                body: $0.body ?? "")
+                }
+            } catch { }
+            historyLoading = false
         }
     }
 

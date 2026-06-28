@@ -167,7 +167,7 @@ enum MenuBarRenderer {
 
         let bottomText: String
         if b.plugged {
-            bottomText = b.fullyCharged ? "Full" : (b.timeMinutes.map(hhmm) ?? "—")
+            bottomText = b.fullyCharged ? tr("Full", "100%") : (b.timeMinutes.map(hhmm) ?? "—")
         } else {
             bottomText = b.timeMinutes.map(hhmm) ?? "—"
         }

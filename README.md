@@ -45,14 +45,16 @@ A native macOS menu bar utility that shows **what is burning energy and heating 
   amperage, signed battery power, real system power draw (SMC telemetry),
   runtime estimate at the current load, power adapter details, manufacture date
   and cell vendor, serial number.
-- **One-click self-update** — check from Settings; the app downloads the new
-  release and replaces itself, then relaunches (no drag-and-drop, no Gatekeeper prompt).
+- **Auto-updates with release notes** — checks GitHub in the background, shows
+  what's new (bilingual notes), and self-updates in one click with a progress bar —
+  no drag-and-drop, no Gatekeeper prompt.
+- **English & Russian UI** — switch language in Settings; the whole interface adapts instantly.
 - **Launch at login**, refresh rate of 1/2/5/10 s.
 - **Full thermal sensor list** (hundreds of SoC sensors) in settings.
 
 ### Download
 
-**[SystemControl-1.2.6.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
+**[SystemControl-1.3.0.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
 open the image and drag `System Control` to `Applications`.
 
 The app is ad-hoc signed (not notarized), so on first launch:
@@ -139,14 +141,17 @@ swift -e 'import Foundation; DistributedNotificationCenter.default().postNotific
   напряжение и ток, мощность батареи со знаком, реальное потребление системы
   (из телеметрии SMC), прогноз времени работы при текущей нагрузке, параметры
   адаптера питания, дата производства и производитель ячеек, серийник.
-- **Обновление в один клик** — проверка из настроек; приложение само скачивает
-  новую версию, заменяет себя и перезапускается (без перетаскивания и окон Gatekeeper).
+- **Авто-обновление с release notes** — фоновая проверка GitHub, показ «что нового»
+  (двуязычные заметки) и установка в один клик с прогрессом — без перетаскивания
+  и окон Gatekeeper.
+- **Интерфейс на английском и русском** — переключение языка в настройках, весь
+  интерфейс адаптируется мгновенно.
 - **Автозапуск при логине**, настройка частоты обновления (1/2/5/10 с).
 - **Полный список термосенсоров** (сотни датчиков SoC) — в настройках.
 
 ### Скачать
 
-**[SystemControl-1.2.6.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
+**[SystemControl-1.3.0.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
 открыть образ и перетащить `System Control` в `Applications`.
 
 Приложение подписано ad-hoc (не нотаризовано), поэтому при первом запуске:

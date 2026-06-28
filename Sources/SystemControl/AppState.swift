@@ -48,6 +48,11 @@ final class AppState: ObservableObject {
     @Published var updateInterval: Double {
         didSet { defaults.set(updateInterval, forKey: "updateInterval"); restartTimer() }
     }
+    // Язык интерфейса (en/ru). Вьюхи наблюдают state → перестраиваются сами.
+    @Published var lang: AppLang {
+        didSet { uiLang = lang; defaults.set(lang.rawValue, forKey: "lang") }
+    }
+
     // Что показывать в трее на вкладке Energy
     @Published var menuBarEnergyMode: MenuBarEnergyMode {
         didSet {
@@ -152,6 +157,7 @@ final class AppState: ObservableObject {
         }
         let i = defaults.double(forKey: "updateInterval")
         updateInterval = i > 0 ? i : 2
+        lang = uiLang   // uiLang уже вычислен (сохранённый или системный)
         menuBarEnergyMode = (defaults.string(forKey: "menuBarEnergyMode"))
             .flatMap(MenuBarEnergyMode.init) ?? .temperature
         menuBarShowsPower = defaults.object(forKey: "menuBarShowsPower") as? Bool ?? true
@@ -321,18 +327,18 @@ final class AppState: ObservableObject {
         if !force, let app = NSRunningApplication(processIdentifier: entry.pid),
            app.activationPolicy == .regular || app.activationPolicy == .accessory {
             if app.terminate() {
-                flash("Sent quit to \(entry.name)")
+                flash(tr("Sent quit to ", "Закрываю ") + entry.name)
                 return
             }
         }
         let signal: Int32 = force ? SIGKILL : SIGTERM
         if Darwin.kill(entry.pid, signal) == 0 {
-            flash(force ? "Force killed \(entry.name)" : "Terminated \(entry.name)")
+            flash((force ? tr("Force killed ", "Убит ") : tr("Terminated ", "Завершён ")) + entry.name)
         } else {
             switch errno {
-            case EPERM: flash("No permission — \(entry.name) is a system process")
-            case ESRCH: flash("\(entry.name) already exited")
-            default: flash("Failed to kill \(entry.name)")
+            case EPERM: flash(tr("No permission — system process: ", "Нет прав — системный процесс: ") + entry.name)
+            case ESRCH: flash(entry.name + tr(" already exited", " уже завершён"))
+            default: flash(tr("Failed to kill ", "Не удалось завершить ") + entry.name)
             }
         }
     }

@@ -45,6 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             suspensionBehavior: .deliverImmediately
         )
+        // Фоновая авто-проверка обновлений (через 12с + каждые 6ч)
+        UpdateChecker.shared.startAutoChecks()
         hcDebugLog("launched, toggle observer registered")
     }
 

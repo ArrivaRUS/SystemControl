@@ -141,7 +141,7 @@ private struct ProcessRow: View {
     }
 
     private var subtitle: String {
-        if entry.isGroup { return "\(entry.processCount) processes" }
+        if entry.isGroup { return "\(entry.processCount) " + tr("processes", "процессов") }
         return "pid \(entry.pid)"
     }
 
@@ -189,7 +189,7 @@ private struct KillButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
-        .help("Terminate")
+        .help(tr("Terminate", "Завершить"))
         .animation(.easeOut(duration: 0.12), value: hovered)
     }
 }
@@ -200,10 +200,10 @@ private struct ConfirmCluster: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            CapsuleButton(label: "Quit", fill: Color.white.opacity(0.12), textColor: .primary) {
+            CapsuleButton(label: tr("Quit", "Закрыть"), fill: Color.white.opacity(0.12), textColor: .primary) {
                 onKill(false)
             }
-            CapsuleButton(label: "Force", fill: Theme.red.opacity(0.88), textColor: .white) {
+            CapsuleButton(label: tr("Force", "Убить"), fill: Theme.red.opacity(0.88), textColor: .white) {
                 onKill(true)
             }
             Button(action: onCancel) {
@@ -251,11 +251,11 @@ private struct EmptyListState: View {
             Image(systemName: state.historyDepth < 3 ? "hourglass" : "leaf.fill")
                 .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(state.historyDepth < 3 ? Color.secondary : Theme.mint.opacity(0.8))
-            Text(state.historyDepth < 3 ? "Warming up…" : "All quiet")
+            Text(state.historyDepth < 3 ? tr("Warming up…", "Прогрев…") : tr("All quiet", "Всё спокойно"))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
             if state.historyDepth >= 3 {
-                Text("Nothing is burning energy right now")
+                Text(tr("Nothing is burning energy right now", "Сейчас никто не грузит систему"))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary.opacity(0.7))
             }

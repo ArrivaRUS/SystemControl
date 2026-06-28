@@ -8,7 +8,13 @@ struct SettingsView: View {
     @State private var launchAtLogin = false
     @State private var loginError: String?
     @State private var sensorsExpanded = false
-    @StateObject private var updater = UpdateChecker()
+    @State private var notesExpanded = false
+    @ObservedObject private var updater = UpdateChecker.shared
+
+    private var langBinding: Binding<Int> {
+        Binding(get: { state.lang == .en ? 0 : 1 },
+                set: { state.lang = $0 == 0 ? .en : .ru })
+    }
 
     private var isBundled: Bool { Bundle.main.bundleIdentifier != nil }
 
@@ -37,10 +43,10 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             // Шапка настроек
             HStack(spacing: 8) {
-                IconButton(systemName: "chevron.left", help: "Back") {
+                IconButton(systemName: "chevron.left", help: tr("Back", "Назад")) {
                     isPresented = false
                 }
-                Text("Settings")
+                Text(tr("Settings", "Настройки"))
                     .font(.system(size: 13, weight: .semibold))
                 Spacer()
             }
@@ -51,9 +57,16 @@ struct SettingsView: View {
             scrollContainer {
                 VStack(spacing: 10) {
                     settingsCard {
+                        HStack {
+                            rowLabel(icon: "globe", title: tr("Language", "Язык"))
+                            Spacer()
+                            PillPicker(options: ["EN", "RU"], selection: langBinding, fontSize: 9.5)
+                        }
+                        .padding(.vertical, 2)
+                        divider
                         toggleRow(
                             icon: "sparkles",
-                            title: "Launch at login",
+                            title: tr("Launch at login", "Запуск при входе"),
                             isOn: Binding(
                                 get: { launchAtLogin },
                                 set: { setLaunchAtLogin($0) }
@@ -61,17 +74,20 @@ struct SettingsView: View {
                             disabled: !isBundled
                         )
                         if !isBundled {
-                            hint("Available when running as SystemControl.app")
+                            hint(tr("Available when running as System Control.app",
+                                    "Доступно при запуске как System Control.app"))
                         }
                         if let loginError {
                             hint(loginError, color: Theme.red)
                         }
                         divider
                         HStack {
-                            rowLabel(icon: "menubar.rectangle", title: "Menu bar (Energy)")
+                            rowLabel(icon: "menubar.rectangle", title: tr("Menu bar (Energy)", "В трее (Energy)"))
                             Spacer()
                             PillPicker(
-                                options: AppState.energyModeChoices.map(\.label),
+                                options: AppState.energyModeChoices.map {
+                                    $0.mode == .temperature ? tr("Temp", "Темп") : $0.label
+                                },
                                 selection: energyModeBinding,
                                 fontSize: 9.5
                             )
@@ -80,12 +96,12 @@ struct SettingsView: View {
                         divider
                         toggleRow(
                             icon: "bolt.fill",
-                            title: "Power draw in menu bar (on AC)",
+                            title: tr("Power draw in menu bar (on AC)", "Мощность в трее (на питании)"),
                             isOn: $state.menuBarShowsPower
                         )
                         divider
                         HStack {
-                            rowLabel(icon: "arrow.triangle.2.circlepath", title: "Refresh rate")
+                            rowLabel(icon: "arrow.triangle.2.circlepath", title: tr("Refresh rate", "Частота обновления"))
                             Spacer()
                             PillPicker(
                                 options: AppState.intervalChoices.map(\.label),
@@ -108,8 +124,8 @@ struct SettingsView: View {
                                 rowLabel(
                                     icon: "sensor.fill",
                                     title: sensorsExpanded
-                                        ? "All thermal sensors (\(state.sensors.count))"
-                                        : "All thermal sensors"
+                                        ? tr("All thermal sensors", "Все термосенсоры") + " (\(state.sensors.count))"
+                                        : tr("All thermal sensors", "Все термосенсоры")
                                 )
                                 Spacer()
                                 Image(systemName: "chevron.down")
@@ -124,7 +140,7 @@ struct SettingsView: View {
                         if sensorsExpanded {
                             divider
                             if state.sensors.isEmpty {
-                                hint("No sensors detected")
+                                hint(tr("No sensors detected", "Сенсоры не найдены"))
                             }
                             ForEach(state.sensors) { sensor in
                                 HStack {
@@ -143,9 +159,13 @@ struct SettingsView: View {
                         }
                     }
 
-                    // Версия + проверка обновлений
+                    // Версия + проверка обновлений + release notes
                     settingsCard {
                         updateRow
+                        if updater.updateAvailable, !updater.notes.isEmpty {
+                            divider
+                            releaseNotesView
+                        }
                     }
 
                     HStack(spacing: 0) {
@@ -172,34 +192,76 @@ struct SettingsView: View {
     @ViewBuilder
     private var updateRow: some View {
         HStack(spacing: 8) {
-            rowLabel(icon: "arrow.down.circle", title: "Version \(updater.currentVersion)")
+            rowLabel(icon: "arrow.down.circle", title: tr("Version", "Версия") + " \(updater.currentVersion)")
             Spacer()
             switch updater.status {
             case .checking:
-                Text("Checking…")
+                Text(tr("Checking…", "Проверка…"))
                     .font(.system(size: 10.5, weight: .medium))
                     .foregroundStyle(.secondary)
-            case .downloading:
-                Text("Downloading…")
-                    .font(.system(size: 10.5, weight: .medium))
+            case .downloading(let p):
+                Text(tr("Downloading", "Загрузка") + " \(Int(p * 100))%")
+                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
             case .available(let v, let url):
-                updateButton("Update to \(v)", fill: Theme.ember) { updater.installUpdate(url) }
+                updateButton(tr("Update to", "Обновить до") + " \(v)", fill: Theme.ember) {
+                    updater.installUpdate(url)
+                }
             case .upToDate:
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Theme.mint)
-                    Text("Up to date")
+                    Text(tr("Up to date", "Последняя версия"))
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
             default:
-                updateButton(updater.status == .failed ? "Retry" : "Check for Updates",
+                updateButton(updater.status == .failed ? tr("Retry", "Повторить")
+                                                       : tr("Check for Updates", "Проверить обновления"),
                              fill: Color.white.opacity(0.12), textColor: .primary) { updater.check() }
             }
         }
         .animation(.easeOut(duration: 0.18), value: updater.status)
+    }
+
+    // Накопленные release notes (за все пропущенные версии), сворачиваемые
+    @ViewBuilder
+    private var releaseNotesView: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { notesExpanded.toggle() }
+            } label: {
+                HStack {
+                    rowLabel(icon: "sparkles.rectangle.stack", title: tr("What's new", "Что нового"))
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(notesExpanded ? 0 : -90))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if notesExpanded {
+                ForEach(updater.notes) { note in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(note.version)" + (note.date.isEmpty ? "" : "  ·  \(note.date)"))
+                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                            .foregroundStyle(Theme.amber)
+                        let body = tidyReleaseNotes(localizedReleaseBody(note.body, state.lang))
+                        Text(body.isEmpty ? "—" : body)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 2)
+                }
+            }
+        }
     }
 
     private func updateButton(_ label: String, fill: Color, textColor: Color = .white,

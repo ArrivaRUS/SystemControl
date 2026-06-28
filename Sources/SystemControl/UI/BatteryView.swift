@@ -26,23 +26,23 @@ struct BatteryView: View {
 
             HStack(spacing: 8) {
                 StatCard(
-                    title: "HEALTH",
+                    title: tr("HEALTH", "ЗДОРОВЬЕ"),
                     value: String(format: "%.0f%%", b.healthPercent),
                     subtitle: "\(b.fullChargeCapacitymAh.formatted()) / \(b.designCapacitymAh.formatted()) mAh",
                     color: healthColor(b.healthPercent),
                     barFraction: b.healthPercent / 100
                 )
                 StatCard(
-                    title: "CYCLES",
+                    title: tr("CYCLES", "ЦИКЛЫ"),
                     value: "\(b.cycleCount)",
-                    subtitle: "rated ~1000",
+                    subtitle: tr("rated ~1000", "ресурс ~1000"),
                     color: cycleColor(b.cycleCount),
                     barFraction: Double(b.cycleCount) / 1000
                 )
                 StatCard(
-                    title: "TEMP",
+                    title: tr("TEMP", "ТЕМП."),
                     value: String(format: "%.1f°", b.temperature),
-                    subtitle: "battery",
+                    subtitle: tr("battery", "батарея"),
                     color: Theme.tempColor(b.temperature + 25), // батарея холоднее SoC — сдвиг шкалы
                     barFraction: b.temperature / 60
                 )
@@ -116,14 +116,14 @@ private struct ChargeHero: View {
     }
 
     private var statusLine: String {
-        if b.fullyCharged && b.externalConnected { return "Fully charged · on AC power" }
+        if b.fullyCharged && b.externalConnected { return tr("Fully charged · on AC power", "Полный заряд · от сети") }
         if b.isCharging {
-            if let t = b.timeRemainingMinutes { return "Charging · \(hhmm(t)) to full" }
-            return "Charging"
+            if let t = b.timeRemainingMinutes { return tr("Charging · ", "Зарядка · ") + hhmm(t) + tr(" to full", " до полного") }
+            return tr("Charging", "Зарядка")
         }
-        if b.externalConnected { return "Plugged in · not charging" }
-        if let t = b.timeRemainingMinutes { return "On battery · \(hhmm(t)) left" }
-        return "On battery"
+        if b.externalConnected { return tr("Plugged in · not charging", "Подключено · не заряжается") }
+        if let t = b.timeRemainingMinutes { return tr("On battery · ", "От батареи · ") + hhmm(t) + tr(" left", " осталось") }
+        return tr("On battery", "От батареи")
     }
 
     private func hhmm(_ minutes: Int) -> String {
@@ -195,12 +195,12 @@ private struct ElectricalCard: View {
             // Прогноз времени работы — только когда реально работаем от батареи
             if !b.externalConnected {
                 divider
-                row(icon: "hourglass", label: "Runtime at current load",
+                row(icon: "hourglass", label: tr("Runtime at current load", "Работа при текущей нагрузке"),
                     value: b.estEmptyMinutes.map { "\($0 / 60):" + String(format: "%02d", $0 % 60) } ?? "—",
                     valueColor: .primary)
             }
             divider
-            row(icon: "bolt.horizontal", label: "Voltage · Amperage",
+            row(icon: "bolt.horizontal", label: tr("Voltage · Amperage", "Напряжение · ток"),
                 value: String(format: "%.2f V · %+.2f A", b.voltage, b.amperage),
                 valueColor: .primary)
             if b.externalConnected {
@@ -221,7 +221,7 @@ private struct ElectricalCard: View {
     }
 
     private var adapterLabel: String {
-        var label = b.adapterName?.capitalized ?? "Power adapter"
+        var label = b.adapterName?.capitalized ?? tr("Power adapter", "Адаптер питания")
         if let v = b.adapterVolts, let a = b.adapterAmps {
             label += String(format: " · %.0fV × %.0fA", v, a)
         }
@@ -240,12 +240,12 @@ private struct ElectricalCard: View {
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(Theme.amber)
                 .frame(width: 16)
-            Text(b.externalConnected ? "Power draw" : "Power · on battery")
+            Text(b.externalConnected ? tr("Power draw", "Потребление") : tr("Power · on battery", "Потребление · от батареи"))
                 .font(.system(size: 10.5, weight: .medium))
                 .foregroundStyle(.primary.opacity(0.85))
             Spacer()
             if charging {
-                Text("\(Int(b.batteryWatts.rounded())) W → battery")
+                Text("\(Int(b.batteryWatts.rounded())) W → " + tr("battery", "батарея"))
                     .font(.system(size: 9.5, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(Theme.mint)
@@ -285,17 +285,17 @@ private struct DetailsCard: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            detail("Charge now", "\(b.currentCapacitymAh.formatted()) mAh")
-            detail("Full charge capacity", "\(b.fullChargeCapacitymAh.formatted()) mAh")
-            detail("Design capacity", "\(b.designCapacitymAh.formatted()) mAh")
+            detail(tr("Charge now", "Текущий заряд"), "\(b.currentCapacitymAh.formatted()) mAh")
+            detail(tr("Full charge capacity", "Полная ёмкость"), "\(b.fullChargeCapacitymAh.formatted()) mAh")
+            detail(tr("Design capacity", "Проектная ёмкость"), "\(b.designCapacitymAh.formatted()) mAh")
             if let m = b.manufactureText {
-                detail("Manufactured", m)
+                detail(tr("Manufactured", "Произведена"), m)
             }
             if let v = b.vendorText {
-                detail("Cell vendor", v)
+                detail(tr("Cell vendor", "Производитель ячеек"), v)
             }
             // Чип и серийник — в одну строку, чтобы раздел влезал без прокрутки
-            detail("Chip · serial", "\(b.deviceName) · \(b.serial)")
+            detail(tr("Chip · serial", "Чип · серийник"), "\(b.deviceName) · \(b.serial)")
         }
         .padding(11)
         .background(
@@ -328,7 +328,7 @@ private struct NoBatteryState: View {
             Image(systemName: "battery.slash")
                 .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(.secondary)
-            Text("No battery found")
+            Text(tr("No battery found", "Батарея не найдена"))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
         }

@@ -91,16 +91,16 @@ private struct HeaderBar: View {
             TabSwitcher(tab: $tab)
 
             if isFloating {
-                IconButton(systemName: "pin.slash", help: "Unpin floating panel") {
+                IconButton(systemName: "pin.slash", help: tr("Unpin floating panel", "Открепить окно")) {
                     PanelController.shared.close()
                 }
             } else {
-                IconButton(systemName: "pin", help: "Pin as floating panel (always on top)") {
+                IconButton(systemName: "pin", help: tr("Pin as floating panel (always on top)", "Закрепить поверх всех окон")) {
                     PanelController.shared.show()
                     closeMenuBarPopup()
                 }
             }
-            IconButton(systemName: "gearshape", help: "Settings") {
+            IconButton(systemName: "gearshape", help: tr("Settings", "Настройки")) {
                 showSettings.toggle()
             }
         }
@@ -117,8 +117,8 @@ private struct TabSwitcher: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            tabButton(.energy, icon: "flame.fill", help: "Energy & temperatures")
-            tabButton(.battery, icon: "battery.100percent", help: "Battery health & usage")
+            tabButton(.energy, icon: "flame.fill", help: tr("Energy & temperatures", "Энергия и температуры"))
+            tabButton(.battery, icon: "battery.100percent", help: tr("Battery health & usage", "Здоровье и расход батареи"))
         }
         .padding(2)
         .background(Capsule().fill(Color.white.opacity(0.05)))
@@ -326,13 +326,13 @@ private struct SectionHeader: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text("TOP ENERGY")
+            Text(tr("TOP ENERGY", "ТОП НАГРУЗКИ"))
                 .font(.system(size: 9.5, weight: .bold))
                 .tracking(1.5)
                 .foregroundStyle(.secondary)
             warmupNote
             Spacer()
-            PillPicker(options: ["Apps", "Procs"], selection: groupingBinding)
+            PillPicker(options: [tr("Apps", "Прил."), tr("Procs", "Проц.")], selection: groupingBinding)
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)
@@ -345,7 +345,7 @@ private struct SectionHeader: View {
             HStack(spacing: 3) {
                 Image(systemName: "hourglass")
                     .font(.system(size: 7.5, weight: .bold))
-                Text("collecting \(Int(state.historyDepth))s / \(Int(state.windowSeconds))s")
+                Text(tr("collecting", "сбор") + " \(Int(state.historyDepth))s / \(Int(state.windowSeconds))s")
                     .font(.system(size: 8.5, weight: .semibold, design: .rounded))
                     .monospacedDigit()
             }
@@ -386,7 +386,7 @@ private struct FooterBar: View {
                     )
                 }
                 Spacer()
-                Text("\(state.processCount) processes")
+                Text("\(state.processCount) " + tr("processes", "процессов"))
                     .font(.system(size: 9.5, weight: .medium, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -402,7 +402,7 @@ private struct FooterBar: View {
                 }
                 Spacer()
             }
-            IconButton(systemName: "power", help: "Quit System Control", size: 11) {
+            IconButton(systemName: "power", help: tr("Quit System Control", "Выйти из System Control"), size: 11) {
                 NSApp.terminate(nil)
             }
         }
@@ -414,12 +414,12 @@ private struct FooterBar: View {
     }
 
     private var batteryStatus: String {
-        guard let b = state.battery else { return "No battery" }
+        guard let b = state.battery else { return tr("No battery", "Нет батареи") }
         if b.externalConnected {
-            if let w = b.adapterWatts { return "AC power · \(w)W adapter" }
-            return "AC power"
+            if let w = b.adapterWatts { return tr("AC power", "Питание") + " · \(w)W " + tr("adapter", "адаптер") }
+            return tr("AC power", "Питание от сети")
         }
-        return "On battery"
+        return tr("On battery", "От батареи")
     }
 }
 

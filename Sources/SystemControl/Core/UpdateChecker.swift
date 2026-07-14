@@ -252,13 +252,25 @@ final class UpdateChecker: ObservableObject {
 }
 
 // Тело релиза может нести оба языка, разделённые <!--RU--> / <!--EN-->.
-// Возвращает секцию для языка; если маркеров нет — всё тело.
+// Порядок маркеров любой; секция тянется от своего маркера до следующего.
+// Нужного языка нет — отдаём другой; маркеров нет вовсе — всё тело.
 func localizedReleaseBody(_ body: String, _ lang: AppLang) -> String {
-    guard let en = body.range(of: "<!--EN-->") else { return body }
-    let enPart = String(body[en.upperBound...])
-    var ruPart = String(body[..<en.lowerBound])
-    if let ru = ruPart.range(of: "<!--RU-->") { ruPart = String(ruPart[ru.upperBound...]) }
-    return (lang == .en ? enPart : ruPart).trimmingCharacters(in: .whitespacesAndNewlines)
+    // Текст от маркера `mark` до ближайшего из `others`, идущего ПОСЛЕ него.
+    func section(_ mark: String, before others: [String]) -> String? {
+        guard let r = body.range(of: mark) else { return nil }
+        var end = body.endIndex
+        for o in others {
+            if let or = body.range(of: o), or.lowerBound > r.upperBound, or.lowerBound < end {
+                end = or.lowerBound
+            }
+        }
+        return String(body[r.upperBound..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    let want = lang == .en ? "<!--EN-->" : "<!--RU-->"
+    let other = lang == .en ? "<!--RU-->" : "<!--EN-->"
+    if let s = section(want, before: [other]), !s.isEmpty { return s }
+    if let s = section(other, before: [want]), !s.isEmpty { return s }
+    return body.trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
 // Лёгкая чистка markdown для показа (заголовки/жирный/код → текст, нормализуем буллеты)

@@ -109,6 +109,8 @@ private struct ChargeHero: View {
     }
 
     private var ringColor: Color {
+        // Критически мало заряда — тревожный бордово-красный, даже во время зарядки
+        if b.percent <= 10 { return Theme.bordeaux }
         if b.isCharging { return Theme.mint }
         if b.percent <= 20 { return Theme.red }
         if b.percent <= 50 { return Theme.amber }

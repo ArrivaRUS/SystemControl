@@ -10,6 +10,7 @@ enum Theme {
     static let amber = Color(red: 1.0, green: 0.72, blue: 0.20)
     static let ember = Color(red: 1.0, green: 0.44, blue: 0.12)
     static let red = Color(red: 1.0, green: 0.25, blue: 0.21)
+    static let bordeaux = Color(red: 0.80, green: 0.08, blue: 0.20) // тревожный винно-красный — критически низкий заряд
     static let mint = Color(red: 0.26, green: 0.83, blue: 0.71)
     static let sky = Color(red: 0.36, green: 0.66, blue: 1.0)
     static let violet = Color(red: 0.69, green: 0.51, blue: 1.0)

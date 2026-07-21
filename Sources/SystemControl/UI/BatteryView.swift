@@ -48,6 +48,7 @@ struct BatteryView: View {
                 )
             }
 
+            PowerModeCard(b: b)
             ElectricalCard(b: b)
             DetailsCard(b: b)
         }
@@ -180,6 +181,216 @@ private struct StatCard: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Theme.cardStroke, lineWidth: 1)
         )
+    }
+}
+
+// MARK: - Режим электропитания и удержание заряда
+
+private struct PowerModeCard: View {
+    let b: BatteryInfo
+    @EnvironmentObject var state: AppState
+    @State private var applying = false
+    @State private var expanded = false
+    @State private var errorText: String?
+
+    // High Power есть не на всех чипах — на base-чипах прячем третий вариант
+    private var modes: [PowerModeKind] {
+        state.powerMode.highSupported ? [.automatic, .low, .high] : [.automatic, .low]
+    }
+
+    var body: some View {
+        VStack(spacing: 7) {
+            modeRow
+            if expanded {
+                divider
+                modeOptions
+            }
+            // Система может включить экономию сама (низкий заряд) — честно об этом говорим
+            if state.powerMode.lpmActive && state.powerMode.mode != .low {
+                divider
+                hint(icon: "leaf.fill",
+                     text: tr("Low Power Mode is active — engaged by the system",
+                              "Экономия включена системой автоматически"),
+                     color: Theme.mint)
+            }
+            if let errorText {
+                divider
+                hint(icon: "exclamationmark.triangle.fill", text: errorText, color: Theme.red)
+            }
+            // Зарядка придержана ниже 100% — ведём в системные настройки,
+            // публичного API у штатной «Зарядить полностью» не существует
+            if b.chargeHeld {
+                divider
+                chargeHoldRow
+            }
+        }
+        .padding(11)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.cardFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Theme.cardStroke, lineWidth: 1)
+        )
+    }
+
+    // Полные системные названия («Энергосбережение», «Высокая мощность») не
+    // помещаются тремя сегментами в 376pt — поэтому выпадающее меню.
+    private var modeRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: state.powerMode.mode.icon)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Theme.amber)
+                .frame(width: 16)
+            Text(tr("Energy Mode", "Режим энергопотребления"))
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(.primary.opacity(0.85))
+                .fixedSize()
+            Spacer(minLength: 6)
+            if applying {
+                ProgressView().controlSize(.small).scaleEffect(0.7).frame(height: 16)
+            } else {
+                modeMenu
+            }
+        }
+    }
+
+    /// Раскрывающийся список ВНУТРИ панели, а не NSMenu: всплывающее меню
+    /// уводит фокус с окна MenuBarExtra и схлопывает сам попап.
+    private var modeMenu: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { expanded.toggle() }
+        } label: {
+            HStack(spacing: 3) {
+                Text(state.powerMode.mode.title)
+                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .fixedSize()
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(expanded ? 180 : 0))
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Color.white.opacity(0.13)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Варианты режимов — вертикальным списком, как в System Settings.
+    /// Смена пессимистична: значение в UI меняется не по клику, а только после
+    /// реально применённой смены — иначе при отмене авторизации панель
+    /// показывала бы режим, который на самом деле не установлен.
+    private var modeOptions: some View {
+        VStack(spacing: 0) {
+            ForEach(modes, id: \.self) { m in
+                let isCurrent = m == state.powerMode.mode
+                Button {
+                    guard !applying else { return }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { expanded = false }
+                    guard !isCurrent else { return }
+                    apply(m)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: m.icon)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(isCurrent ? Theme.sky : Color.secondary)
+                            .frame(width: 16)
+                        Text(m.title)
+                            .font(.system(size: 10.5, weight: isCurrent ? .semibold : .medium))
+                            .foregroundStyle(isCurrent ? Color.primary : Color.primary.opacity(0.75))
+                        Spacer(minLength: 6)
+                        if isCurrent {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Theme.sky)
+                        }
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(isCurrent ? Color.white.opacity(0.07) : .clear)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func apply(_ mode: PowerModeKind) {
+        applying = true
+        errorText = nil
+        // osascript ЖДЁТ ввода пароля в системном диалоге — главный поток блокировать нельзя
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = PowerModeControl.set(mode)
+            DispatchQueue.main.async {
+                applying = false
+                switch result {
+                case .ok, .cancelled:
+                    break // отмена — штатный сценарий, состояние просто перечитаем
+                case .failed(let msg):
+                    errorText = msg.isEmpty
+                        ? tr("Could not change the mode", "Не удалось сменить режим")
+                        : msg
+                }
+                state.refreshPowerMode()
+            }
+        }
+    }
+
+    private var chargeHoldRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "pause.circle.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Theme.amber)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(tr("Charge held at \(b.percent)%", "Заряд удерживается на \(b.percent)%"))
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.primary.opacity(0.85))
+                // Без флага оптимизированной зарядки причина неизвестна: это может
+                // быть и лимит, и тепловая пауза — утверждать «лимит» нельзя.
+                Text(state.powerMode.optimizedCharging
+                     ? tr("Optimized battery charging", "Оптимизированная зарядка")
+                     : tr("Charging paused by the system", "Зарядка приостановлена системой"))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 6)
+            Button(action: { PowerModeControl.openBatterySettings() }) {
+                Text(tr("Charge to 100%", "До 100%"))
+                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Theme.bgBase)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Theme.amber))
+            }
+            .buttonStyle(.plain)
+            .help(tr("Opens System Settings → Battery",
+                     "Откроет Системные настройки → Аккумулятор"))
+        }
+    }
+
+    private func hint(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: 16)
+            Text(text)
+                .font(.system(size: 9.5, weight: .medium))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var divider: some View {
+        Rectangle().fill(Theme.hairline).frame(height: 1)
     }
 }
 

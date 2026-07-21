@@ -45,6 +45,12 @@ A native macOS menu bar utility that shows **what is burning energy and heating 
   amperage, signed battery power, real system power draw (SMC telemetry),
   runtime estimate at the current load, power adapter details, manufacture date
   and cell vendor, serial number.
+- **Energy mode indicator & switcher** — the Battery tab shows the current
+  Energy Mode (Automatic / Low Power / High Power, matching System Settings)
+  and lets you change it in place (macOS asks for an administrator password —
+  the app never sees it). When macOS holds the charge below 100% (optimized
+  charging / charge limit), a "Charge to 100%" shortcut takes you straight
+  to the system Battery settings.
 - **Auto-updates with release notes** — checks GitHub in the background, shows
   what's new (bilingual notes), and self-updates in one click with a progress bar —
   no drag-and-drop, no Gatekeeper prompt.
@@ -54,7 +60,7 @@ A native macOS menu bar utility that shows **what is burning energy and heating 
 
 ### Download
 
-**[SystemControl-1.3.5.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
+**[SystemControl-1.3.6.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
 open the image and drag `System Control` to `Applications`.
 
 The app is ad-hoc signed (not notarized), so on first launch:
@@ -141,6 +147,12 @@ swift -e 'import Foundation; DistributedNotificationCenter.default().postNotific
   напряжение и ток, мощность батареи со знаком, реальное потребление системы
   (из телеметрии SMC), прогноз времени работы при текущей нагрузке, параметры
   адаптера питания, дата производства и производитель ячеек, серийник.
+- **Индикация и смена режима энергопотребления** — вкладка Battery показывает
+  текущий режим (Автоматически / Энергосбережение / Высокая мощность — как в
+  Системных настройках) и позволяет сменить его на месте (macOS запросит пароль
+  администратора — приложение его не видит). Если macOS удерживает заряд ниже
+  100% (оптимизированная зарядка / лимит), кнопка «До 100%» ведёт прямо в
+  системные настройки Аккумулятора.
 - **Авто-обновление с release notes** — фоновая проверка GitHub, показ «что нового»
   (двуязычные заметки) и установка в один клик с прогрессом — без перетаскивания
   и окон Gatekeeper.
@@ -151,7 +163,7 @@ swift -e 'import Foundation; DistributedNotificationCenter.default().postNotific
 
 ### Скачать
 
-**[SystemControl-1.3.5.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
+**[SystemControl-1.3.6.dmg](https://github.com/ArrivaRUS/SystemControl/releases/latest)** —
 открыть образ и перетащить `System Control` в `Applications`.
 
 Приложение подписано ad-hoc (не нотаризовано), поэтому при первом запуске:

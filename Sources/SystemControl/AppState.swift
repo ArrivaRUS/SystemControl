@@ -26,6 +26,8 @@ final class AppState: ObservableObject {
     @Published var sensors: [ThermalSensor] = []
     @Published var battery: BatteryInfo?
     @Published var menuBattery: MenuBatterySummary?
+    // Режим электропитания: читаем только при открытой панели (вкладка Battery)
+    @Published var powerMode = PowerModeState()
     @Published var processCount: Int = 0
     @Published var historyDepth: TimeInterval = 0
     @Published var killMessage: String?
@@ -127,7 +129,16 @@ final class AppState: ObservableObject {
         if let v = smCpuLoad, cpuLoad != v { cpuLoad = v }
         if let v = smGpuLoad, gpuLoad != v { gpuLoad = v }
         if battery != smBattery { battery = smBattery }
+        refreshPowerMode()
         queue.async { [weak self] in self?.tick() }
+    }
+
+    /// Перечитать Energy Mode. Дёшево (dlsym + IOPS), но зовём только при
+    /// видимой панели и сразу после смены режима пользователем.
+    func refreshPowerMode() {
+        let onBattery = !(smBattery?.externalConnected ?? false)
+        let st = PowerModeReader.read(onBattery: onBattery)
+        if powerMode != st { powerMode = st }
     }
 
     func panelDisappeared() {
@@ -254,6 +265,7 @@ final class AppState: ObservableObject {
         // cpuLoad/gpuLoad уже опубликованы выше (нужны трею); тут только gpuTemp
         if let v = smGpuTemp, gpuTemp != v { gpuTemp = v }
         if battery != smBattery { battery = smBattery }
+        refreshPowerMode()
 
         cpuTempHistory = bufCpuTempHistory
         gpuTempHistory = bufGpuTempHistory
